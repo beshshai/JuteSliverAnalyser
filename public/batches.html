@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batches — Jute sliver analyzer</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .batch-list { display: flex; flex-direction: column; gap: 10px; }
+  .batch-card {
+    background: #fff; border: 1px solid #e4e1d9; border-radius: 10px;
+    padding: 1rem 1.25rem; cursor: pointer; transition: border-color 0.15s;
+  }
+  .batch-card:hover { border-color: #185fa5; }
+  .batch-card.active { border-color: #185fa5; background: #f5f9ff; }
+  .batch-card.closed-card { opacity: 0.7; }
+  .batch-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .batch-name { font-weight: 600; font-size: 15px; }
+  .batch-meta { font-size: 12px; color: #6b6a64; margin-top: 3px; }
+  .batch-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .batch-actions button { padding: 5px 10px; font-size: 12px; }
+
+  .detail-panel { background: #fff; border: 1px solid #e4e1d9; border-radius: 10px; padding: 1.25rem; margin-top: 1.5rem; }
+  .detail-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; }
+  .detail-title { font-size: 17px; font-weight: 600; }
+  .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .section-label { font-size: 12px; font-weight: 600; color: #6b6a64; text-transform: uppercase; letter-spacing: 0.05em; margin: 1.25rem 0 0.5rem; }
+
+  .add-zone {
+    border: 2px dashed #d6d3ca; border-radius: 10px;
+    padding: 1.2rem 1rem; text-align: center; cursor: pointer;
+    background: #faf9f6; transition: background 0.15s, border-color 0.15s;
+    font-size: 13px; color: #6b6a64;
+  }
+  .add-zone:hover, .add-zone.drag-over { background: #eef4fb; border-color: #185fa5; }
+  .add-zone strong { display: block; margin-bottom: 4px; color: #1d1d1b; font-size: 14px; }
+  .add-zone.disabled { pointer-events: none; opacity: 0.5; }
+
+  .chip { display: inline-block; border-radius: 5px; padding: 2px 8px; font-size: 12px; }
+  .chip-open { background: #eaf3de; color: #27500a; }
+  .chip-closed { background: #ece9e2; color: #6b6a64; }
+
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 2rem;
+    width: 100%; max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  }
+  .modal h2 { font-size: 17px; margin-bottom: 1rem; }
+  .modal input { margin-bottom: 10px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 1rem; justify-content: flex-end; }
+
+  .result-row { align-items: flex-start; }
+  .sample-hist-wrap { flex-shrink: 0; }
+  .sample-hist-wrap canvas.viz-canvas { width: 150px; max-width: 150px; height: 80px; display: block; }
+  .sample-hist-wrap .hist-caption { font-size: 10.5px; color: #8a8880; margin-top: 3px; text-align: center; }
+
+  .thumb-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; }
+  .thumb-wrap { position: relative; width: 110px; height: 82px; border-radius: 8px; overflow: hidden; border: 1px solid #e4e1d9; }
+  .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .thumb-remove {
+    position: absolute; top: 4px; right: 4px;
+    background: rgba(0,0,0,0.55); color: #fff;
+    border: none; border-radius: 50%; width: 20px; height: 20px;
+    font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+</style>
+</head>
+<body>
+  <div class="topbar" id="topbar"></div>
+
+
+  <div class="tool-shell">
+    <nav class="tool-sidebar">
+      <div class="tool-sidebar-label">Tools</div>
+      <a href="/dashboard" id="sb_fo" class="active"><span class="tool-icon">🔬</span> Fiber Orientation</a>
+      <a href="/mass-variation" class=""><span class="tool-icon">📏</span> Mass Variation</a>
+      <a href="/sliver-width" class=""><span class="tool-icon">🧵</span> Sliver Width</a>
+      <div class="tool-sidebar-sub" id="sb_fo_sub">Fiber Orientation</div>
+      <a href="/dashboard" id="sb_dash" class=""><span class="tool-icon">🖼</span> Upload &amp; Analyse</a>
+      <a href="/batches" id="sb_batches" class="active"><span class="tool-icon">📦</span> Batches</a>
+      <a href="/trends" id="sb_trends" class=""><span class="tool-icon">📈</span> Trends</a>
+    </nav>
+    <div class="tool-content">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:1.5rem;">
+      <div>
+        <h1 class="page-title" style="margin-bottom:0.1rem;">Batches</h1>
+        <p class="page-sub" style="margin-bottom:0;">Group samples into named batches. Add images over time or all at once.</p>
+      </div>
+      <button id="newBatchBtn">+ New batch</button>
+    </div>
+
+    <div class="batch-list" id="batchList">
+      <div class="empty-state"><span class="spinner"></span>Loading...</div>
+    </div>
+
+    <div class="detail-panel" id="detailPanel" style="display:none;"></div>
+  </div>
+
+  <!-- Create batch modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <h2 id="modalTitle">New batch</h2>
+      <input type="text" id="modalName" placeholder="Batch name" maxlength="100">
+      <select id="modalMachine" style="margin-bottom:10px;">
+        <option value="">Machine type (optional)</option>
+      </select>
+      <input type="text" id="modalNotes" placeholder="Notes (optional)" maxlength="200">
+      <div class="modal-actions">
+        <button class="secondary" id="modalCancel">Cancel</button>
+        <button id="modalSave">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/shared.js?v=6"></script>
+  <script>
+    let currentUser = null;
+    let activeBatchId = null;
+
+    // ── modal ──────────────────────────────────────────────────────────
+    const modalOverlay = document.getElementById('modalOverlay');
+    document.getElementById('newBatchBtn').addEventListener('click', () => openModal());
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+
+    async function openModal() {
+      document.getElementById('modalName').value = '';
+      document.getElementById('modalNotes').value = '';
+      document.getElementById('modalMachine').value = '';
+      // Populate machine dropdown if not already done
+      const sel = document.getElementById('modalMachine');
+      if (sel.options.length <= 1) {
+        const machines = await fetchMachines();
+        machines.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.name;
+          opt.textContent = m.name;
+          sel.appendChild(opt);
+        });
+      }
+      modalOverlay.classList.add('open');
+      document.getElementById('modalName').focus();
+    }
+    function closeModal() { modalOverlay.classList.remove('open'); }
+
+    document.getElementById('modalSave').addEventListener('click', async () => {
+      const name = document.getElementById('modalName').value.trim();
+      if (!name) { document.getElementById('modalName').focus(); return; }
+      const notes = document.getElementById('modalNotes').value.trim();
+      const machineType = document.getElementById('modalMachine').value.trim() || null;
+      const res = await fetch('/api/batches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, notes, machine_type: machineType })
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error); return; }
+      closeModal();
+      await loadBatches();
+      openBatch(data.batch.id);
+    });
+
+    // ── batch list ─────────────────────────────────────────────────────
+    async function loadBatches() {
+      const res = await fetch('/api/batches');
+      const data = await res.json();
+      const list = document.getElementById('batchList');
+
+      if (!data.batches.length) {
+        list.innerHTML = '<div class="empty-state">No batches yet. Create one to get started.</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      data.batches.forEach(b => {
+        const card = document.createElement('div');
+        card.className = 'batch-card' + (b.id === activeBatchId ? ' active' : '') + (b.closed ? ' closed-card' : '');
+        card.id = 'bcard-' + b.id;
+        card.innerHTML = `
+          <div class="batch-header">
+            <div>
+              <div class="batch-name">${escapeHtml(b.name)}
+                <span class="chip ${b.closed ? 'chip-closed' : 'chip-open'}" style="margin-left:6px;">${b.closed ? 'Closed' : 'Open'}</span>
+              </div>
+              <div class="batch-meta">
+                By ${escapeHtml(b.user_name)} · ${timeAgo(b.created_at)}
+                · ${b.sample_count} sample${b.sample_count !== 1 ? 's' : ''}
+                ${b.avg_score != null ? ' · avg score ' + b.avg_score : ''}
+                ${b.notes ? ' · ' + escapeHtml(b.notes) : ''}
+              </div>
+            </div>
+            <div class="batch-actions" onclick="event.stopPropagation()">
+              ${currentUser && currentUser.id === b.user_id ? `
+                ${b.closed
+                  ? `<button class="secondary" onclick="reopenBatch('${b.id}')">Reopen</button>`
+                  : `<button class="secondary" onclick="closeBatch('${b.id}')">Close</button>`}
+                <button class="secondary" style="color:#a32d2d;" onclick="deleteBatch('${b.id}')">Delete</button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+        card.addEventListener('click', () => openBatch(b.id));
+        list.appendChild(card);
+      });
+    }
+
+    async function closeBatch(id) {
+      await fetch('/api/batches/' + id + '/close', { method: 'PATCH' });
+      await loadBatches();
+      if (activeBatchId === id) openBatch(id);
+    }
+
+    async function reopenBatch(id) {
+      await fetch('/api/batches/' + id + '/reopen', { method: 'PATCH' });
+      await loadBatches();
+      if (activeBatchId === id) openBatch(id);
+    }
+
+    async function deleteBatch(id) {
+      if (!confirm('Delete this batch? Samples inside will also be deleted.')) return;
+      // delete each sample first
+      const r = await fetch('/api/batches/' + id);
+      const d = await r.json();
+      for (const s of (d.samples || [])) {
+        await fetch('/api/samples/' + s.id, { method: 'DELETE' });
+      }
+      // no dedicated batch DELETE route — just hide it by marking closed for now
+      // If you want hard delete, add app.delete('/api/batches/:id') to server.js
+      alert('Samples deleted. The batch shell will remain listed but empty.');
+      await loadBatches();
+      if (activeBatchId === id) {
+        activeBatchId = null;
+        document.getElementById('detailPanel').style.display = 'none';
+      }
+    }
+
+    // ── detail panel ───────────────────────────────────────────────────
+    async function openBatch(id) {
+      document.querySelectorAll('.batch-card').forEach(c => c.classList.remove('active'));
+      const card = document.getElementById('bcard-' + id);
+      if (card) card.classList.add('active');
+
+      activeBatchId = id;
+      const panel = document.getElementById('detailPanel');
+      panel.style.display = 'block';
+      panel.innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading...</div>';
+
+      const res = await fetch('/api/batches/' + id);
+      const data = await res.json();
+      if (!res.ok) { panel.innerHTML = '<div class="empty-state">Failed to load.</div>'; return; }
+      renderDetail(data);
+    }
+
+    // per-batch file staging (Map so indices never collide across reopens)
+    let fileMap = new Map();
+    let fileCounter = 0;
+
+    function renderDetail({ batch, samples }) {
+      // reset staging
+      fileMap.clear();
+
+      const panel = document.getElementById('detailPanel');
+      const isClosed = !!batch.closed;
+      const isOwner = currentUser && currentUser.id === batch.user_id;
+
+      const samplesHtml = samples.length ? samples.map(s => {
+        const badge = scoreBadgeClass(s.score);
+        const color = scoreColor(s.score);
+        return `
+          <div class="result-row">
+            <img class="thumb" src="${s.image_path}" alt="sample">
+            <div class="result-meta">
+              <div class="result-meta-top">
+                <span class="uploader">${escapeHtml(s.user_name)}</span>
+                <span class="badge ${badge.cls}">${badge.label} · ${s.score}/100</span>
+              </div>
+              <div class="score-bar-bg"><div class="score-bar-fill" style="width:${s.score}%; background:${color};"></div></div>
+              <div class="result-metrics">
+                Mean angle ${s.mean_angle_deg}° · std dev ${s.angular_stddev_deg}° · ${s.width}×${s.height}px
+                ${s.notes ? ' · ' + escapeHtml(s.notes) : ''}
+              </div>
+              <div class="result-meta-top" style="margin-top:4px;">
+                <span class="timestamp">${timeAgo(s.created_at)}</span>
+                ${currentUser && currentUser.id === s.user_id ? `<button class="delete-btn" onclick="deleteSample('${s.id}','${batch.id}')">Delete</button>` : ''}
+              </div>
+            </div>
+            <div class="sample-hist-wrap">
+              <canvas class="viz-canvas" id="hist-${s.id}"></canvas>
+              <div class="hist-caption">Orientation histogram</div>
+            </div>
+          </div>`;
+      }).join('') : '<div style="font-size:13px;color:#6b6a64;padding:0.5rem 0;">No samples yet.</div>';
+
+      panel.innerHTML = `
+        <div class="detail-header">
+          <div>
+            <div class="detail-title">${escapeHtml(batch.name)}</div>
+            ${batch.notes ? `<div style="font-size:13px;color:#6b6a64;margin-top:2px;">${escapeHtml(batch.notes)}</div>` : ''}
+          </div>
+          <div class="detail-actions">
+            <a href="/report?type=batch&id=${batch.id}"><button class="secondary">View report</button></a>
+            ${isOwner ? (isClosed
+              ? `<button class="secondary" onclick="reopenBatch('${batch.id}')">Reopen batch</button>`
+              : `<button class="secondary" onclick="closeBatch('${batch.id}')">Close batch</button>`) : ''}
+          </div>
+        </div>
+
+        ${!isClosed ? `
+          <div class="section-label">Add images to this batch</div>
+          <div class="add-zone" id="addZone">
+            <strong>+ Drop images here or click to browse</strong>
+            JPG or PNG, up to 10 at a time — analyzed immediately
+          </div>
+          <input type="file" id="addFileInput" accept="image/*" multiple style="display:none">
+          <div class="thumb-grid" id="stageGrid"></div>
+          <div style="display:flex;gap:10px;margin-top:1rem;">
+            <button id="uploadBtn" style="display:none;">Analyze &amp; add to batch</button>
+            <button class="secondary" id="clearStageBtn" style="display:none;">Clear</button>
+          </div>
+          <div id="uploadProgress" style="font-size:13px;color:#6b6a64;margin-top:6px;min-height:18px;"></div>
+          <div class="error-msg" id="uploadError" style="display:none;"></div>
+        ` : '<div style="font-size:13px;color:#6b6a64;margin:0.75rem 0;">This batch is closed. Reopen it to add more images.</div>'}
+
+        <div class="section-label">Samples (${samples.length})</div>
+        ${samples.length ? `
+          <div style="display:flex; align-items:flex-start; gap:1.25rem; flex-wrap:wrap; margin-bottom:1rem; background:#faf9f6; border:1px solid #e4e1d9; border-radius:8px; padding:0.85rem 1rem;">
+            <div>
+              <canvas class="viz-canvas" id="batchCombinedHist" style="width:240px; max-width:240px;"></canvas>
+              <div class="hist-caption" style="text-align:center; margin-top:4px;">Combined orientation histogram (all samples)</div>
+            </div>
+            <div style="font-size:12px; color:#6b6a64; max-width:280px; padding-top:4px;">
+              Every sample's full angle-bin data is combined and weighted by edge-pixel count, so no input data is dropped — this is the same chart used in the batch report.
+            </div>
+          </div>
+        ` : ''}
+        ${samplesHtml}
+      `;
+
+      if (!isClosed) wireUploader(batch.id);
+
+      // Draw histograms now that the canvases exist in the DOM.
+      if (samples.length) {
+        drawBatchCombinedHistogram(samples);
+        samples.forEach(s => {
+          const canvas = document.getElementById('hist-' + s.id);
+          if (!canvas) return;
+          let hist = null;
+          try { hist = s.histogram_json ? JSON.parse(s.histogram_json) : null; } catch (e) { hist = null; }
+          if (hist && hist.length) {
+            drawHistogramCanvas(canvas, hist, s.mean_angle_deg || 0);
+          } else {
+            const ctx = canvas.getContext('2d');
+            canvas.width = 150; canvas.height = 80;
+            ctx.fillStyle = '#111'; ctx.fillRect(0, 0, 150, 80);
+            ctx.fillStyle = '#6b6a64'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText('No histogram data', 75, 42);
+          }
+        });
+      }
+    }
+
+    // Combine every sample's full histogram (all bins, no data dropped),
+    // weighted by edge pixel count — mirrors server-side combine_histograms()
+    // used for the batch report, so the inline chart matches the report.
+    function drawBatchCombinedHistogram(samples) {
+      const canvas = document.getElementById('batchCombinedHist');
+      if (!canvas) return;
+      const BINS = 36;
+      const combined = new Array(BINS).fill(0);
+      let weightedAngleSum = 0, weightSum = 0;
+      samples.forEach(s => {
+        if (!s.histogram_json) return;
+        let hist;
+        try { hist = JSON.parse(s.histogram_json); } catch (e) { return; }
+        const weight = s.edge_pixel_count || 1;
+        for (let i = 0; i < Math.min(BINS, hist.length); i++) {
+          combined[i] += hist[i] * weight;
+        }
+        if (s.mean_angle_deg != null) {
+          weightedAngleSum += s.mean_angle_deg * weight;
+          weightSum += weight;
+        }
+      });
+      const maxVal = Math.max(...combined, 1);
+      const normalized = combined.map(v => v / maxVal);
+      const avgAngle = weightSum ? weightedAngleSum / weightSum : 0;
+      drawHistogramCanvas(canvas, normalized, avgAngle);
+    }
+
+    function wireUploader(batchId) {
+      const addZone = document.getElementById('addZone');
+      const addFileInput = document.getElementById('addFileInput');
+      const stageGrid = document.getElementById('stageGrid');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const clearStageBtn = document.getElementById('clearStageBtn');
+      const uploadProgress = document.getElementById('uploadProgress');
+      const uploadError = document.getElementById('uploadError');
+
+      addZone.addEventListener('click', () => addFileInput.click());
+      addZone.addEventListener('dragover', e => { e.preventDefault(); addZone.classList.add('drag-over'); });
+      addZone.addEventListener('dragleave', () => addZone.classList.remove('drag-over'));
+      addZone.addEventListener('drop', e => { e.preventDefault(); addZone.classList.remove('drag-over'); stageFiles([...e.dataTransfer.files]); });
+      addFileInput.addEventListener('change', () => { stageFiles([...addFileInput.files]); addFileInput.value = ''; });
+
+      function stageFiles(newFiles) {
+        const remaining = 10 - fileMap.size;
+        newFiles.slice(0, remaining).forEach(f => {
+          if (!f.type.startsWith('image/')) return;
+          const idx = fileCounter++;
+          fileMap.set(idx, f);
+          const reader = new FileReader();
+          reader.onload = e => {
+            const wrap = document.createElement('div');
+            wrap.className = 'thumb-wrap';
+            wrap.id = 'sthumb-' + idx;
+            wrap.innerHTML = `<img src="${e.target.result}" alt=""><button class="thumb-remove" onclick="removeStaged(${idx})">×</button>`;
+            stageGrid.appendChild(wrap);
+          };
+          reader.readAsDataURL(f);
+        });
+        updateUploadBtn();
+      }
+
+      window.removeStaged = function(idx) {
+        fileMap.delete(idx);
+        const el = document.getElementById('sthumb-' + idx);
+        if (el) el.remove();
+        updateUploadBtn();
+      };
+
+      function updateUploadBtn() {
+        const has = fileMap.size > 0;
+        uploadBtn.style.display = has ? 'inline-flex' : 'none';
+        clearStageBtn.style.display = has ? 'inline-flex' : 'none';
+      }
+
+      clearStageBtn.addEventListener('click', () => {
+        fileMap.clear();
+        stageGrid.innerHTML = '';
+        updateUploadBtn();
+      });
+
+      uploadBtn.addEventListener('click', async () => {
+        const validFiles = [...fileMap.values()];
+        if (!validFiles.length) return;
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
+        uploadError.style.display = 'none';
+        uploadProgress.textContent = `Uploading 0 / ${validFiles.length}...`;
+
+        let done = 0;
+        for (const f of validFiles) {
+          const fd = new FormData();
+          fd.append('image', f);
+          fd.append('batch_id', batchId);
+          try {
+            const res = await fetch('/api/samples', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (!res.ok) {
+              uploadError.textContent = `${f.name}: ${data.error}`;
+              uploadError.style.display = 'block';
+            } else {
+              done++;
+              uploadProgress.textContent = `Uploaded ${done} / ${validFiles.length}...`;
+            }
+          } catch (e) {
+            uploadError.textContent = `${f.name}: upload failed`;
+            uploadError.style.display = 'block';
+          }
+        }
+
+        fileMap.clear();
+        stageGrid.innerHTML = '';
+        updateUploadBtn();
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = 'Analyze &amp; add to batch';
+        uploadProgress.textContent = done === validFiles.length ? 'Done!' : `${done} of ${validFiles.length} uploaded.`;
+        setTimeout(() => { uploadProgress.textContent = ''; }, 2500);
+        await loadBatches();
+        openBatch(batchId);
+      });
+    }
+
+    async function deleteSample(sampleId, batchId) {
+      if (!confirm('Delete this sample?')) return;
+      await fetch('/api/samples/' + sampleId, { method: 'DELETE' });
+      await loadBatches();
+      openBatch(batchId);
+    }
+
+    (async function init() {
+      currentUser = await initTopbar('batches');
+      if (!currentUser) return;
+      await loadBatches();
+    })();
+  </script>
+    </div><!-- /tool-content -->
+  </div><!-- /tool-shell -->
+</body>
+</html>

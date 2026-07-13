@@ -1,0 +1,1858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mass Variation Analysis — Jute sliver analyzer</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  /* layout handled by shared.js tool-sidebar injection */
+
+  /* ── mode selector bar ── */
+  .mode-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #f5f4f1;
+    border: 1px solid #e4e1d9;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .mode-bar label { font-size: 13px; color: #1d1d1b; font-weight: 600; white-space: nowrap; }
+  .mode-bar select {
+    padding: 5px 10px;
+    border: 1px solid #d6d3ca;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    cursor: pointer;
+  }
+  .mode-divider { width: 1px; height: 24px; background: #e4e1d9; }
+  .cut-length-group { display: flex; align-items: center; gap: 8px; }
+  .cut-length-group label { font-size: 13px; color: #1d1d1b; font-weight: 600; white-space: nowrap; }
+  .cut-length-group input {
+    width: 80px; padding: 5px 8px; border: 1px solid #d6d3ca;
+    border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff;
+  }
+  .cut-length-unit { font-size: 12px; color: #6b6a64; }
+
+  /* ── sample name inputs ── */
+  .sample-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0.5rem;
+  }
+  .sample-name-row label { font-size: 13px; color: #6b6a64; white-space: nowrap; }
+  .sample-name-input {
+    padding: 4px 10px; border: 1px solid #d6d3ca; border-radius: 6px;
+    font-size: 13px; font-family: inherit; background: #faf9f6; width: 200px;
+  }
+  .sample-name-input:focus { outline: none; border-color: #185fa5; background: #fff; }
+
+  /* ── data entry table ── */
+  .measure-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .measure-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b6a64;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 6px 8px;
+    border-bottom: 1px solid #e4e1d9;
+  }
+  .measure-table td {
+    padding: 3px 4px;
+    border-bottom: 1px solid #f0ede6;
+  }
+  .measure-table td:first-child {
+    color: #9a9890;
+    font-size: 11px;
+    width: 32px;
+    text-align: center;
+  }
+  .measure-table input[type="number"] {
+    width: 100%;
+    padding: 5px 8px;
+    border: 1px solid #dbd8d0;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #faf9f6;
+    transition: border-color 0.12s;
+  }
+  .measure-table input[type="number"]:focus {
+    outline: none;
+    border-color: #185fa5;
+    background: #fff;
+  }
+  .measure-table tr.outlier-row td { background: #fff8f0; }
+  .measure-table tr.outlier-row input { border-color: #e8a020; }
+
+  /* ── stat cards ── */
+  .stat-grid-wa {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    margin-top: 0.75rem;
+  }
+  .stat-card {
+    background: #faf9f6;
+    border: 1px solid #e4e1d9;
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+  }
+  .stat-card.highlight { background: #eff5ff; border-color: #c0d4f5; }
+  .stat-card.warn { background: #fff8f0; border-color: #f0d090; }
+  .stat-card.danger { background: #fff2f2; border-color: #f0b0b0; }
+  .stat-val { font-size: 22px; font-weight: 700; color: #1d1d1b; }
+  .stat-lbl { font-size: 11px; color: #6b6a64; margin-top: 2px; }
+  .stat-desc { font-size: 10px; color: #9a9890; margin-top: 3px; font-style: italic; }
+
+  /* ── control chart ── */
+  .chart-wrap { position: relative; width: 100%; margin-top: 0.5rem; }
+  canvas.cc-canvas { width: 100%; border-radius: 6px; display: block; }
+
+  /* ── quality badge ── */
+  .quality-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .qb-good { background: #d4f5e9; color: #0e7a55; }
+  .qb-moderate { background: #fef0cc; color: #8a5a00; }
+  .qb-poor { background: #fde4e4; color: #b52020; }
+
+  /* ── tabs ── */
+  .set-tabs { display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .set-tab {
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #d6d3ca;
+    border-radius: 6px;
+    cursor: pointer;
+    background: #faf9f6;
+    color: #6b6a64;
+    transition: all 0.12s;
+  }
+  .set-tab.active { background: #185fa5; border-color: #185fa5; color: #fff; }
+
+  /* ── section divider ── */
+  .section-head {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b6a64;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid #e4e1d9;
+    padding-bottom: 6px;
+    margin: 1.5rem 0 1rem;
+  }
+
+  /* ── button row ── */
+  .btn-row { display: flex; gap: 8px; margin-top: 1rem; flex-wrap: wrap; }
+  .btn-primary {
+    padding: 8px 18px; font-size: 13px; font-weight: 600;
+    background: #185fa5; color: #fff; border: none; border-radius: 6px; cursor: pointer;
+  }
+  .btn-primary:hover { background: #1450a0; }
+  .btn-secondary {
+    padding: 8px 14px; font-size: 13px; font-weight: 500;
+    background: #fff; color: #1d1d1b; border: 1px solid #d6d3ca; border-radius: 6px; cursor: pointer;
+  }
+  .btn-secondary:hover { background: #f5f4f1; }
+  .btn-danger {
+    padding: 8px 14px; font-size: 13px; font-weight: 500;
+    background: #fff; color: #b52020; border: 1px solid #f0b0b0; border-radius: 6px; cursor: pointer;
+  }
+  .btn-danger:hover { background: #fff2f2; }
+
+  /* ── distribution bar ── */
+  .dist-bar-bg { height: 10px; border-radius: 5px; overflow: hidden; background: #f0ede6; display: flex; }
+  .dist-seg { height: 100%; transition: width 0.4s; }
+  .dist-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .dist-legend { display: flex; gap: 14px; font-size: 11px; color: #6b6a64; margin-top: 6px; }
+
+  /* ── histogram ── */
+  .hist-canvas { border-radius: 6px; width: 100%; display: block; }
+
+  /* ── compare table ── */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .compare-table th {
+    text-align: left; padding: 6px 8px;
+    font-size: 11px; font-weight: 600; color: #6b6a64;
+    border-bottom: 1px solid #e4e1d9; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .compare-table td { padding: 5px 8px; border-bottom: 1px solid #f0ede6; }
+  .compare-table td:first-child { color: #1d1d1b; font-weight: 500; }
+  .compare-table td.val-a { color: #185fa5; font-weight: 600; }
+  .compare-table td.val-b { color: #8a4fa0; font-weight: 600; }
+
+  /* ── row count input ── */
+  .row-num-input {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 0.75rem; flex-wrap: wrap;
+  }
+  .row-num-input label { font-size: 13px; color: #6b6a64; }
+  .row-num-input input {
+    width: 70px; padding: 6px 10px; border: 1px solid #d6d3ca; border-radius: 6px;
+    font-size: 13px; font-family: inherit; background: #faf9f6;
+  }
+
+  /* ── notes area ── */
+  .notes-area {
+    width: 100%; padding: 10px 12px; border: 1px solid #d6d3ca; border-radius: 8px;
+    font-size: 13px; font-family: inherit; background: #faf9f6; resize: vertical; min-height: 56px;
+    box-sizing: border-box;
+  }
+
+  /* ── batch log ── */
+  .batch-log { display: flex; flex-direction: column; gap: 8px; margin-top: 0.5rem; }
+  .batch-entry {
+    background: #faf9f6; border: 1px solid #e4e1d9; border-radius: 8px;
+    padding: 10px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  }
+  .batch-entry-info { flex: 1; min-width: 0; }
+  .batch-entry-title { font-size: 13px; font-weight: 600; color: #1d1d1b; }
+  .batch-entry-meta { font-size: 11px; color: #6b6a64; margin-top: 2px; }
+  .batch-entry-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+  .batch-entry-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .batch-entry-actions button { padding: 4px 10px; font-size: 12px; }
+  .batch-empty { font-size: 13px; color: #9a9890; padding: 1rem 0; text-align: center; }
+
+  /* ── trend mini chart ── */
+  .trend-wrap { margin-top: 1rem; }
+  canvas.trend-canvas { width: 100%; display: block; border-radius: 6px; }
+</style>
+</head>
+<body>
+  <div class="topbar" id="topbar"></div>
+
+  <div class="tool-shell">
+    <!-- ── Left sidebar ── -->
+    <nav class="tool-sidebar" id="mvaSidebar" style="">
+      <div class="tool-sidebar-label">Tools</div>
+      <a href="/dashboard"><span class="tool-icon">🔬</span> Fiber Orientation</a>
+      <a href="/mass-variation" class="active"><span class="tool-icon">📏</span> Mass Variation</a>
+      <div class="tool-sidebar-sub">Mass Variation</div>
+      <a href="#" id="sidebarMVAnalysis" onclick="showView('analysis'); return false;"><span class="tool-icon">📊</span> Analysis</a>
+      <a href="#" id="sidebarMVTrends" onclick="showView('trends'); return false;"><span class="tool-icon">📈</span> Trends</a>
+      <a href="#" id="sidebarMVBatch" onclick="showView('batch'); return false;"><span class="tool-icon">📦</span> Batch</a>
+
+    </nav>
+
+    <div class="tool-content">
+
+      <!-- ══════════════════════════════════════════════════
+           VIEW: ANALYSIS
+      ══════════════════════════════════════════════════ -->
+      <div id="viewAnalysis">
+        <h1 class="page-title" style="margin-bottom:0.25rem;">Mass Variation Analysis</h1>
+        <p class="page-sub" style="margin-bottom:1.25rem;">
+          Enter measurements manually to compute mass variation statistics — CV%, U%, MIU, control limits, and distribution.
+        </p>
+
+        <!-- ── Mode selector bar ── -->
+        <div class="mode-bar">
+          <label for="measureMode">Measure by:</label>
+          <select id="measureMode" onchange="onModeChange()">
+            <option value="width">Width (mm)</option>
+            <option value="weight">Weight (g)</option>
+          </select>
+        </div>
+
+        <!-- ── Input card ── -->
+        <div class="card">
+          <div class="set-tabs">
+            <button class="set-tab active" id="tabA" onclick="switchSet('A')">
+              <span id="tabALabel">Sample A — Manual</span>
+            </button>
+            <button class="set-tab" id="tabB" onclick="switchSet('B')">
+              <span id="tabBLabel">Sample B — Manual</span>
+            </button>
+            <button class="set-tab" id="tabBoth" onclick="switchSet('Both')" style="margin-left:auto;">Compare</button>
+          </div>
+
+          <!-- Set A Panel -->
+          <div id="inputPanelA">
+            <div class="sample-name-row">
+              <label>Sample name:</label>
+              <input type="text" class="sample-name-input" id="nameA" placeholder="e.g. Machine M1 — Morning" value="Sample A" oninput="updateSampleLabels()">
+            </div>
+            <div class="sample-name-row" style="margin-top:0.5rem;">
+              <label for="machineA">Machine name:</label>
+              <select id="machineA" style="flex:1; min-width:160px; max-width:260px;">
+                <option value="">Select machine…</option>
+              </select>
+              <button type="button" class="btn-secondary" style="padding:5px 10px; font-size:12px;" onclick="openMachineManager()">Manage machines</button>
+            </div>
+            <div class="cut-length-group" style="margin-bottom:0.75rem;">
+              <label for="cutLengthA" style="font-size:13px;color:#1d1d1b;font-weight:600;white-space:nowrap;">Cut length of Sample A:</label>
+              <input type="number" id="cutLengthA" min="1" step="0.1" placeholder="e.g. 10" style="width:80px;padding:5px 8px;border:1px solid #d6d3ca;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;">
+              <span style="font-size:12px;color:#6b6a64;">cm</span>
+            </div>
+            <div class="row-num-input">
+              <label>Number of measurements:</label>
+              <input type="number" id="nRowsA" min="5" max="200" value="20" onchange="resizeTable('A')">
+            </div>
+            <div class="section-head" id="headA">Sample A — Width measurements (mm)</div>
+            <table class="measure-table">
+              <thead><tr><th>#</th><th id="colHeaderA">Width (mm)</th></tr></thead>
+              <tbody id="tableBodyA"></tbody>
+            </table>
+            <div style="margin-top:0.75rem;">
+              <label style="font-size:13px;color:#6b6a64;display:block;margin-bottom:4px;">Notes (optional)</label>
+              <textarea class="notes-area" id="notesA" placeholder="e.g. Machine M1, 3rd drawn, morning shift"></textarea>
+            </div>
+          </div>
+
+          <!-- Set B Panel -->
+          <div id="inputPanelB" style="display:none;">
+            <div class="sample-name-row">
+              <label>Sample name:</label>
+              <input type="text" class="sample-name-input" id="nameB" placeholder="e.g. Machine M2 — Afternoon" value="Sample B" oninput="updateSampleLabels()">
+            </div>
+            <div class="sample-name-row" style="margin-top:0.5rem;">
+              <label for="machineB">Machine name:</label>
+              <select id="machineB" style="flex:1; min-width:160px; max-width:260px;">
+                <option value="">Select machine…</option>
+              </select>
+              <button type="button" class="btn-secondary" style="padding:5px 10px; font-size:12px;" onclick="openMachineManager()">Manage machines</button>
+            </div>
+            <div class="cut-length-group" style="margin-bottom:0.75rem;">
+              <label for="cutLengthB" style="font-size:13px;color:#1d1d1b;font-weight:600;white-space:nowrap;">Cut length of Sample B:</label>
+              <input type="number" id="cutLengthB" min="1" step="0.1" placeholder="e.g. 10" style="width:80px;padding:5px 8px;border:1px solid #d6d3ca;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;">
+              <span style="font-size:12px;color:#6b6a64;">cm</span>
+            </div>
+            <div class="row-num-input">
+              <label>Number of measurements:</label>
+              <input type="number" id="nRowsB" min="5" max="200" value="20" onchange="resizeTable('B')">
+            </div>
+            <div class="section-head" id="headB">Sample B — Width measurements (mm)</div>
+            <table class="measure-table">
+              <thead><tr><th>#</th><th id="colHeaderB">Width (mm)</th></tr></thead>
+              <tbody id="tableBodyB"></tbody>
+            </table>
+            <div style="margin-top:0.75rem;">
+              <label style="font-size:13px;color:#6b6a64;display:block;margin-bottom:4px;">Notes (optional)</label>
+              <textarea class="notes-area" id="notesB" placeholder="e.g. Machine M20, after adjustment"></textarea>
+            </div>
+          </div>
+
+          <!-- Compare panel -->
+          <div id="inputPanelBoth" style="display:none;">
+            <p style="font-size:13px;color:#6b6a64;">Switch to Sample A or Sample B to enter measurements, then come back here for a side-by-side comparison.</p>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-primary" onclick="runAnalysis()">Analyse</button>
+            <button class="btn-secondary" id="pasteBtn" onclick="pasteData()">Paste from clipboard</button>
+            <button class="btn-secondary" onclick="clearAll()">Clear everything</button>
+            <button class="btn-secondary" onclick="saveToBatch()" style="margin-left:auto;">💾 Save to Batch</button>
+          </div>
+        </div>
+
+        <!-- ── Results ── -->
+        <div id="resultsArea" style="display:none;">
+
+          <div id="statsCardsA" class="card" style="display:none;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.5rem;flex-wrap:wrap;">
+              <h2 style="font-size:15px;font-weight:600;margin:0;" id="statsHeadA">Sample A — Statistics</h2>
+              <span id="qualityBadgeA"></span>
+              <span id="cutLengthBadgeA" style="font-size:11px;color:#6b6a64;"></span>
+            </div>
+            <div class="stat-grid-wa" id="statGridA"></div>
+          </div>
+
+          <div id="statsCardsB" class="card" style="display:none;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.5rem;flex-wrap:wrap;">
+              <h2 style="font-size:15px;font-weight:600;margin:0;" id="statsHeadB">Sample B — Statistics</h2>
+              <span id="qualityBadgeB"></span>
+              <span id="cutLengthBadgeB" style="font-size:11px;color:#6b6a64;"></span>
+            </div>
+            <div class="stat-grid-wa" id="statGridB"></div>
+          </div>
+
+          <div id="compareCard" class="card" style="display:none;">
+            <h2 style="font-size:15px;font-weight:600;margin-bottom:0.75rem;" id="compareHeadTitle">Sample A vs Sample B Comparison</h2>
+            <table class="compare-table">
+              <thead><tr><th>Metric</th><th id="compareHeadA">Sample A</th><th id="compareHeadB">Sample B</th><th>Better</th></tr></thead>
+              <tbody id="compareTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Control Chart A -->
+          <div id="controlChartCardA" class="card" style="display:none;">
+            <h2 style="font-size:15px;font-weight:600;margin-bottom:0.25rem;" id="controlChartTitleA">Control Chart — Sample A</h2>
+            <p style="font-size:12px;color:#6b6a64;margin-bottom:0.75rem;">
+              Each point is one measurement. UCL / LCL are ±3σ limits. Points outside limits flag potential outliers.
+            </p>
+            <div class="chart-wrap"><canvas id="controlChartCanvasA" class="cc-canvas"></canvas></div>
+          </div>
+
+          <!-- Control Chart B -->
+          <div id="controlChartCardB" class="card" style="display:none;">
+            <h2 style="font-size:15px;font-weight:600;margin-bottom:0.25rem;" id="controlChartTitleB">Control Chart — Sample B</h2>
+            <p style="font-size:12px;color:#6b6a64;margin-bottom:0.75rem;">
+              Each point is one measurement. UCL / LCL are ±3σ limits. Points outside limits flag potential outliers.
+            </p>
+            <div class="chart-wrap"><canvas id="controlChartCanvasB" class="cc-canvas"></canvas></div>
+          </div>
+
+          <!-- Histogram A -->
+          <div id="histCardA" class="card" style="display:none;">
+            <h2 style="font-size:15px;font-weight:600;margin-bottom:0.25rem;" id="histTitleA">Distribution — Sample A</h2>
+            <p style="font-size:12px;color:#6b6a64;margin-bottom:0.75rem;" id="histSubtitleA">Frequency histogram of measurements.</p>
+            <canvas id="histCanvasA" class="hist-canvas" height="160"></canvas>
+            <div class="dist-bar-wrap" id="distBarWrapA" style="display:none;margin-top:0.75rem;">
+              <div style="font-size:12px;color:#6b6a64;margin-bottom:4px;">Within ±1σ / ±2σ / ±3σ</div>
+              <div class="dist-bar-bg">
+                <div class="dist-seg" id="seg1A" style="background:#1D9E75;"></div>
+                <div class="dist-seg" id="seg2A" style="background:#BA7517;"></div>
+                <div class="dist-seg" id="seg3A" style="background:#E24B4A;"></div>
+                <div class="dist-seg" id="seg4A" style="background:#f0ede6;"></div>
+              </div>
+              <div class="dist-legend">
+                <span><span class="dist-dot" style="background:#1D9E75;"></span>±1σ: <span id="pct1sA"></span>%</span>
+                <span><span class="dist-dot" style="background:#BA7517;"></span>±2σ: <span id="pct2sA"></span>%</span>
+                <span><span class="dist-dot" style="background:#E24B4A;"></span>±3σ: <span id="pct3sA"></span>%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Histogram B -->
+          <div id="histCardB" class="card" style="display:none;">
+            <h2 style="font-size:15px;font-weight:600;margin-bottom:0.25rem;" id="histTitleB">Distribution — Sample B</h2>
+            <p style="font-size:12px;color:#6b6a64;margin-bottom:0.75rem;" id="histSubtitleB">Frequency histogram of measurements.</p>
+            <canvas id="histCanvasB" class="hist-canvas" height="160"></canvas>
+            <div class="dist-bar-wrap" id="distBarWrapB" style="display:none;margin-top:0.75rem;">
+              <div style="font-size:12px;color:#6b6a64;margin-bottom:4px;">Within ±1σ / ±2σ / ±3σ</div>
+              <div class="dist-bar-bg">
+                <div class="dist-seg" id="seg1B" style="background:#1D9E75;"></div>
+                <div class="dist-seg" id="seg2B" style="background:#BA7517;"></div>
+                <div class="dist-seg" id="seg3B" style="background:#E24B4A;"></div>
+                <div class="dist-seg" id="seg4B" style="background:#f0ede6;"></div>
+              </div>
+              <div class="dist-legend">
+                <span><span class="dist-dot" style="background:#1D9E75;"></span>±1σ: <span id="pct1sB"></span>%</span>
+                <span><span class="dist-dot" style="background:#BA7517;"></span>±2σ: <span id="pct2sB"></span>%</span>
+                <span><span class="dist-dot" style="background:#E24B4A;"></span>±3σ: <span id="pct3sB"></span>%</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /resultsArea -->
+      </div><!-- /viewAnalysis -->
+
+
+      <!-- ══════════════════════════════════════════════════
+           VIEW: TRENDS
+      ══════════════════════════════════════════════════ -->
+      <div id="viewTrends" style="display:none;">
+        <h1 class="page-title" style="margin-bottom:0.25rem;">Mass Variation — Trends</h1>
+        <p class="page-sub" style="margin-bottom:1.25rem;">Compare metrics across saved batch entries with flexible filtering.</p>
+
+        <div class="card" id="trendsCard">
+          <!-- ── 3 dropdowns ── -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem;">
+
+            <!-- 1. Metric -->
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:11px;font-weight:600;color:#6b6a64;text-transform:uppercase;letter-spacing:0.04em;">Metric</label>
+              <select id="trendMetricSel" onchange="onTrendFilterChange()" style="padding:6px 10px;border:1px solid #d6d3ca;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;">
+                <option value="cvPct">CV%</option>
+                <option value="uPct">U%</option>
+                <option value="miu">MIU%</option>
+                <option value="mean">Mean</option>
+                <option value="sdS">SD (sample)</option>
+                <option value="sdP">SD (population)</option>
+                <option value="range">Range</option>
+                <option value="iqr">IQR</option>
+                <option value="skew">Skewness</option>
+              </select>
+            </div>
+
+            <!-- 2. Cut length filter -->
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:11px;font-weight:600;color:#6b6a64;text-transform:uppercase;letter-spacing:0.04em;">Cut Length</label>
+              <select id="trendCutLenSel" onchange="onTrendFilterChange()" style="padding:6px 10px;border:1px solid #d6d3ca;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;">
+                <option value="all">All cut lengths</option>
+              </select>
+            </div>
+
+            <!-- 3. Time grouping -->
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:11px;font-weight:600;color:#6b6a64;text-transform:uppercase;letter-spacing:0.04em;">Group by</label>
+              <select id="trendTimeSel" onchange="onTrendFilterChange()" style="padding:6px 10px;border:1px solid #d6d3ca;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;">
+                <option value="individual">Individual logs</option>
+                <option value="day">Day</option>
+                <option value="month">Month</option>
+                <option value="year">Year</option>
+              </select>
+            </div>
+
+          </div>
+
+          <!-- ── machine filter + priority (own row) ── -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem;padding-top:0.85rem;border-top:1px solid #ece9e2;">
+
+            <!-- 4. Machine -->
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:11px;font-weight:600;color:#6b6a64;text-transform:uppercase;letter-spacing:0.04em;">Machine</label>
+              <select id="trendMachineSel" onchange="onTrendFilterChange()" style="padding:6px 10px;border:1px solid #d6d3ca;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;min-width:180px;">
+                <option value="all">All machines</option>
+              </select>
+            </div>
+
+            <!-- 5. Priority -->
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:11px;font-weight:600;color:#6b6a64;text-transform:uppercase;letter-spacing:0.04em;">Priority</label>
+              <select id="trendMachinePrioritySel" onchange="onTrendFilterChange()" style="padding:6px 10px;border:1px solid #d6d3ca;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;min-width:170px;" title="Only affects ordering when 'Group by' is set to Individual logs and a Machine is selected">
+                <option value="stage" selected>Priority: Machine stage</option>
+                <option value="logtime">Priority: Log time (oldest first)</option>
+              </select>
+            </div>
+
+          </div>
+
+          <div id="trendFilterInfo" style="font-size:11px;color:#9a9890;margin-bottom:0.5rem;"></div>
+
+          <div class="trend-wrap">
+            <canvas id="trendCanvas" class="trend-canvas" height="180"></canvas>
+          </div>
+          <div id="trendEmpty" style="text-align:center;font-size:13px;color:#9a9890;padding:2rem 0;display:none;">
+            No saved batch entries yet. Run an analysis and save it to a batch to see trends here.
+          </div>
+
+          <!-- Legend -->
+          <div id="trendLegend" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:0.75rem;font-size:11px;color:#6b6a64;"></div>
+        </div>
+
+        <div class="card" style="margin-top:1rem;">
+          <h2 style="font-size:15px;font-weight:600;margin-bottom:0.75rem;">Filtered Entries Summary</h2>
+          <div id="trendEntriesList"><p style="font-size:13px;color:#9a9890;">Loading…</p></div>
+        </div>
+      </div>
+
+
+      <!-- ══════════════════════════════════════════════════
+           VIEW: BATCH
+      ══════════════════════════════════════════════════ -->
+      <div id="viewBatch" style="display:none;">
+        <h1 class="page-title" style="margin-bottom:0.25rem;">Mass Variation — Batch</h1>
+        <p class="page-sub" style="margin-bottom:1.25rem;">Manage and compare saved analysis sessions.</p>
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:0.75rem;">
+            <h2 style="font-size:15px;font-weight:600;margin:0;">Saved Entries</h2>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-secondary" onclick="exportBatchCSV()">⬇ Export CSV</button>
+              <button class="btn-danger" onclick="clearAllBatch()">🗑 Clear all</button>
+            </div>
+          </div>
+          <div class="batch-log" id="batchLog">
+            <div class="batch-empty">No entries saved yet. Run an analysis and click "Save to Batch".</div>
+          </div>
+        </div>
+
+        <!-- Batch compare card (shown when 2+ selected) -->
+        <div id="batchCompareCard" class="card" style="display:none;margin-top:1rem;">
+          <h2 style="font-size:15px;font-weight:600;margin-bottom:0.75rem;">Batch Comparison</h2>
+          <div id="batchCompareContent"></div>
+        </div>
+      </div>
+
+    </div><!-- /mva-content -->
+  </div><!-- /mva-shell -->
+
+<script src="/shared.js?v=6"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────────
+let currentSet = 'A';
+let statsA = null, statsB = null;
+let measureMode = 'width'; // 'width' | 'weight'
+let currentView = 'analysis';
+
+// In-memory batch store (persists in sessionStorage for the session)
+let batchEntries = [];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  await initTopbar('mass-variation');
+  buildTable('A', 20);
+  buildTable('B', 20);
+  loadBatchFromStorage();
+  updateSampleLabels();
+  onModeChange();
+  await loadMachineSelectors();
+  showView('analysis');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Machine name (Sample A / Sample B) — fixed list + permanent custom entries
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadMachineSelectors() {
+  const machines = await fetchMachines();
+  populateMachineSelect(document.getElementById('machineA'), machines, { blankLabel: 'Select machine…' });
+  populateMachineSelect(document.getElementById('machineB'), machines, { blankLabel: 'Select machine…' });
+}
+
+function openMachineManager() {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `<div style="background:#fff;border-radius:12px;padding:1.5rem;max-width:420px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+      <h2 style="font-size:16px;font-weight:700;margin:0;">Manage machines</h2>
+      <button id="mmCloseBtn" style="border:none;background:none;font-size:20px;cursor:pointer;color:#6b6a64;">×</button>
+    </div>
+    <p style="font-size:12px;color:#6b6a64;margin:0 0 0.75rem;">Add a custom machine name to keep it permanently in the list for everyone, or remove ones you no longer need. The default machine types can't be removed.</p>
+    <div style="display:flex; gap:8px; margin-bottom:1rem;">
+      <input type="text" id="mmNewName" placeholder="e.g. Draw-4" style="flex:1; padding:6px 10px; border:1px solid #d6d3ca; border-radius:6px; font-size:13px; font-family:inherit;">
+      <button id="mmAddBtn" class="btn-primary" style="padding:6px 14px; font-size:13px;">Add</button>
+    </div>
+    <div id="mmError" style="display:none; font-size:12px; color:#E24B4A; margin-bottom:0.5rem;"></div>
+    <div id="mmList"></div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  modal.querySelector('#mmCloseBtn').addEventListener('click', () => modal.remove());
+
+  async function refreshList() {
+    const machines = await fetchMachines();
+    const list = modal.querySelector('#mmList');
+    list.innerHTML = machines.map(m => `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-top:1px solid #ece9e2;">
+        <span style="font-size:13px;">${escapeHtml(m.name)}</span>
+        ${m.is_default
+          ? '<span style="font-size:11px;color:#9a9890;">default</span>'
+          : `<button class="btn-danger mm-del" data-id="${m.id}" style="padding:3px 8px; font-size:11px;">Remove</button>`}
+      </div>
+    `).join('');
+    list.querySelectorAll('.mm-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await deleteMachine(btn.dataset.id);
+          await refreshList();
+          await loadMachineSelectors();
+        } catch (e) {
+          showMmError(e.message);
+        }
+      });
+    });
+  }
+
+  function showMmError(msg) {
+    const err = modal.querySelector('#mmError');
+    err.textContent = msg;
+    err.style.display = 'block';
+  }
+
+  modal.querySelector('#mmAddBtn').addEventListener('click', async () => {
+    const input = modal.querySelector('#mmNewName');
+    const name = input.value.trim();
+    if (!name) return;
+    try {
+      await addMachine(name);
+      input.value = '';
+      modal.querySelector('#mmError').style.display = 'none';
+      await refreshList();
+      await loadMachineSelectors();
+    } catch (e) {
+      showMmError(e.message);
+    }
+  });
+  modal.querySelector('#mmNewName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') modal.querySelector('#mmAddBtn').click();
+  });
+
+  refreshList();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// View switching (Analysis / Trends / Batch)
+// ─────────────────────────────────────────────────────────────────────────────
+function showView(v) {
+  currentView = v;
+  ['analysis','trends','batch'].forEach(name => {
+    const el = document.getElementById('view' + name.charAt(0).toUpperCase() + name.slice(1));
+    if (el) el.style.display = (name === v) ? '' : 'none';
+  });
+  ['MVAnalysis','MVTrends','MVBatch'].forEach(id => {
+    const el = document.getElementById('sidebar' + id);
+    if (el) el.classList.toggle('active', id.toLowerCase().replace('mv','') === v);
+  });
+  if (v === 'trends') renderTrendView();
+  if (v === 'batch') renderBatchView();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Measure mode
+// ─────────────────────────────────────────────────────────────────────────────
+function onModeChange() {
+  measureMode = document.getElementById('measureMode').value;
+  const isWeight = measureMode === 'weight';
+  const unit = isWeight ? 'g' : 'mm';
+  const label = isWeight ? 'Weight' : 'Width';
+
+  // cut length units are inline per sample
+
+  // Column headers
+  ['A','B'].forEach(s => {
+    const colH = document.getElementById('colHeader' + s);
+    if (colH) colH.textContent = label + ' (' + unit + ')';
+    const head = document.getElementById('head' + s);
+    const sName = document.getElementById('name' + s) ? document.getElementById('name' + s).value : ('Sample ' + s);
+    if (head) head.textContent = sName + ' — ' + label + ' measurements (' + unit + ')';
+  });
+
+  // Tab labels
+  updateSampleLabels();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sample labels
+// ─────────────────────────────────────────────────────────────────────────────
+function updateSampleLabels() {
+  const nA = (document.getElementById('nameA').value || 'Sample A').trim();
+  const nB = (document.getElementById('nameB').value || 'Sample B').trim();
+  document.getElementById('tabALabel').textContent = nA;
+  document.getElementById('tabBLabel').textContent = nB;
+  document.getElementById('compareHeadA').textContent = nA;
+  document.getElementById('compareHeadB').textContent = nB;
+  const isWeight = measureMode === 'weight';
+  const unit = isWeight ? 'g' : 'mm';
+  const label = isWeight ? 'Weight' : 'Width';
+  ['A','B'].forEach(s => {
+    const nm = s === 'A' ? nA : nB;
+    const head = document.getElementById('head' + s);
+    if (head) head.textContent = nm + ' — ' + label + ' measurements (' + unit + ')';
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab switching
+// ─────────────────────────────────────────────────────────────────────────────
+function switchSet(s) {
+  currentSet = s;
+  ['A','B','Both'].forEach(t => {
+    document.getElementById('tab' + t).classList.toggle('active', t === s);
+    const panel = document.getElementById('inputPanel' + t);
+    if (panel) panel.style.display = (t === s) ? '' : 'none';
+  });
+  document.getElementById('pasteBtn').style.display = (s === 'A' || s === 'B') ? '' : 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Table building
+// ─────────────────────────────────────────────────────────────────────────────
+function buildTable(set, n) {
+  const tbody = document.getElementById('tableBody' + set);
+  const existing = Array.from(tbody.querySelectorAll('input')).map(i => i.value);
+  tbody.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td><input type="number" step="0.001" min="0" placeholder="—" id="r${set}${i}"></td>`;
+    tbody.appendChild(tr);
+    if (i < existing.length && existing[i]) {
+      document.getElementById('r' + set + i).value = existing[i];
+    }
+  }
+}
+
+function resizeTable(set) {
+  const n = parseInt(document.getElementById('nRows' + set).value) || 20;
+  buildTable(set, Math.min(Math.max(n, 5), 200));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paste from clipboard
+// ─────────────────────────────────────────────────────────────────────────────
+async function pasteData() {
+  try {
+    const text = await navigator.clipboard.readText();
+    const nums = text.split(/[\n\r\t,;]+/).map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+    if (!nums.length) { alert('No numbers found in clipboard.'); return; }
+    const set = (currentSet === 'A' || currentSet === 'B') ? currentSet : 'A';
+    const nInput = document.getElementById('nRows' + set);
+    nInput.value = nums.length;
+    buildTable(set, nums.length);
+    nums.forEach((v, i) => {
+      const el = document.getElementById('r' + set + i);
+      if (el) el.value = v;
+    });
+  } catch (e) {
+    alert('Could not access clipboard. Paste manually into the fields.');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Clear
+// ─────────────────────────────────────────────────────────────────────────────
+function clearAll() {
+  ['A','B'].forEach(set => {
+    const tbody = document.getElementById('tableBody' + set);
+    tbody.querySelectorAll('input').forEach(i => i.value = '');
+    document.getElementById('notes' + set).value = '';
+  });
+  document.getElementById('resultsArea').style.display = 'none';
+  statsA = null; statsB = null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read values from a table
+// ─────────────────────────────────────────────────────────────────────────────
+function readValues(set) {
+  const tbody = document.getElementById('tableBody' + set);
+  const inputs = Array.from(tbody.querySelectorAll('input'));
+  return inputs.map(i => parseFloat(i.value)).filter(v => !isNaN(v) && v > 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Statistics engine
+// ─────────────────────────────────────────────────────────────────────────────
+function computeStats(values) {
+  const n = values.length;
+  if (n < 2) return null;
+
+  const sorted = [...values].sort((a,b) => a-b);
+  const mean = values.reduce((s,v) => s+v, 0) / n;
+  const range = sorted[n-1] - sorted[0];
+
+  const varS = values.reduce((s,v) => s + (v-mean)**2, 0) / (n-1);
+  const sdS = Math.sqrt(varS);
+
+  const varP = values.reduce((s,v) => s + (v-mean)**2, 0) / n;
+  const sdP = Math.sqrt(varP);
+
+  const ucl = mean + 3*sdS;
+  const lcl = mean - 3*sdS;
+  const cvPct = (sdS / mean) * 100;
+  const uPct = values.reduce((s,v) => s + Math.abs(v-mean), 0) / (mean*n) * 100;
+  const miu = (range / mean) * 100;
+
+  function quartile(arr, q) {
+    const pos = (arr.length - 1) * q;
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
+    return arr[lo] + (arr[hi] - arr[lo]) * (pos - lo);
+  }
+  const q1 = quartile(sorted, 0.25);
+  const q3 = quartile(sorted, 0.75);
+  const iqr = q3 - q1;
+
+  const skew = values.reduce((s,v) => s + ((v-mean)/sdS)**3, 0) / n;
+
+  function pctInBand(sigma) {
+    return values.filter(v => Math.abs(v-mean) <= sigma * sdS).length / n * 100;
+  }
+  const pct1 = pctInBand(1);
+  const pct2 = pctInBand(2);
+  const pct3 = pctInBand(3);
+
+  const outliers = values.map((v,i) => v > ucl || v < lcl ? i : -1).filter(i => i >= 0);
+
+  let quality;
+  if (cvPct < 5) quality = 'Good';
+  else if (cvPct < 12) quality = 'Moderate';
+  else quality = 'Poor';
+
+  return { n, mean, range, sdS, sdP, ucl, lcl, cvPct, uPct, miu, q1, q3, iqr, skew,
+           pct1, pct2, pct3, outliers, quality, values, sorted };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main analysis
+// ─────────────────────────────────────────────────────────────────────────────
+function runAnalysis() {
+  const valA = readValues('A');
+  const valB = readValues('B');
+
+  statsA = valA.length >= 2 ? computeStats(valA) : null;
+  statsB = valB.length >= 2 ? computeStats(valB) : null;
+
+  if (!statsA && !statsB) {
+    alert('Add at least 2 measurements to Sample A or Sample B to run analysis.');
+    return;
+  }
+
+  ['A','B'].forEach(set => {
+    const st = set === 'A' ? statsA : statsB;
+    const tbody = document.getElementById('tableBody' + set);
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((tr, i) => {
+      tr.classList.toggle('outlier-row', st ? st.outliers.includes(i) : false);
+    });
+  });
+
+  document.getElementById('resultsArea').style.display = '';
+
+  renderStatCards('A', statsA);
+  renderStatCards('B', statsB);
+
+  const cCard = document.getElementById('compareCard');
+  if (statsA && statsB) {
+    renderCompare(statsA, statsB);
+    cCard.style.display = '';
+  } else {
+    cCard.style.display = 'none';
+  }
+
+  const isWeight = measureMode === 'weight';
+  const unit = isWeight ? 'g' : 'mm';
+
+  // Render charts for each sample independently
+  ['A', 'B'].forEach(set => {
+    const st = set === 'A' ? statsA : statsB;
+    const name = document.getElementById('name' + set).value || ('Sample ' + set);
+
+    const ccCard = document.getElementById('controlChartCard' + set);
+    const histCard = document.getElementById('histCard' + set);
+
+    if (!st) {
+      ccCard.style.display = 'none';
+      histCard.style.display = 'none';
+      return;
+    }
+
+    ccCard.style.display = '';
+    document.getElementById('controlChartTitle' + set).textContent = `Control Chart — ${name}`;
+    drawControlChart(st, set);
+
+    histCard.style.display = '';
+    document.getElementById('histTitle' + set).textContent = `Distribution — ${name}`;
+    document.getElementById('histSubtitle' + set).textContent =
+      `Frequency histogram of ${isWeight ? 'weight' : 'width'} measurements (${unit}). A bell-shaped peak near the mean indicates uniform sliver.`;
+    drawHistogram(st, set);
+    renderDistBar(st, set);
+  });
+
+  document.getElementById('resultsArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Render stat card grid
+// ─────────────────────────────────────────────────────────────────────────────
+function renderStatCards(set, st) {
+  const card = document.getElementById('statsCards' + set);
+  const grid = document.getElementById('statGrid' + set);
+  const badge = document.getElementById('qualityBadge' + set);
+  const headEl = document.getElementById('statsHead' + set);
+  const cutBadge = document.getElementById('cutLengthBadge' + set);
+
+  if (!st) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const isWeight = measureMode === 'weight';
+  const unit = isWeight ? 'g' : 'mm';
+  const label = isWeight ? 'Weight' : 'Width';
+  const sName = (document.getElementById('name' + set).value || ('Sample ' + set)).trim();
+
+  headEl.textContent = sName + ' — Statistics';
+
+  const cutLen = parseFloat(document.getElementById('cutLength' + set).value);
+  if (!isNaN(cutLen) && cutLen > 0) {
+    cutBadge.textContent = 'Cut length: ' + cutLen + ' cm';
+  } else {
+    cutBadge.textContent = '';
+  }
+
+  const qcls = { Good: 'qb-good', Moderate: 'qb-moderate', Poor: 'qb-poor' };
+  badge.className = 'quality-badge ' + (qcls[st.quality] || 'qb-moderate');
+  badge.textContent = st.quality + ' quality';
+
+  function sc(val, lbl, desc, type='') {
+    return `<div class="stat-card ${type}">
+      <div class="stat-val">${val}</div>
+      <div class="stat-lbl">${lbl}</div>
+      ${desc ? `<div class="stat-desc">${desc}</div>` : ''}
+    </div>`;
+  }
+
+  const cvClass = st.cvPct < 5 ? '' : st.cvPct < 12 ? 'warn' : 'danger';
+  const uClass  = st.uPct  < 4 ? '' : st.uPct  < 10 ? 'warn' : 'danger';
+
+  grid.innerHTML =
+    sc(st.n,                      'Measurements', '') +
+    sc(fmt(st.mean) + ' ' + unit, `Mean ${label}`, `Average ${label.toLowerCase()}`) +
+    sc(fmt(st.range) + ' ' + unit,'Range',         'Max − Min') +
+    sc(fmt(st.sdS) + ' ' + unit,  'SD (sample)',   '±1σ spread') +
+    sc(fmt(st.sdP) + ' ' + unit,  'SD (pop.)',      'Population σ') +
+    sc(fmt(st.ucl) + ' ' + unit,  'UCL',            'Mean + 3σ') +
+    sc(fmt(Math.max(0, st.lcl)) + ' ' + unit, 'LCL', 'Mean − 3σ') +
+    sc(fmt(st.cvPct) + '%',        'CV%',            'Coeff. of variation', cvClass) +
+    sc(fmt(st.uPct) + '%',         'U%',             'Linear irregularity index',  uClass) +
+    sc(fmt(st.miu) + '%',          'MIU',            'Mean irregularity (range/mean)') +
+    sc(fmt(st.q1) + ' ' + unit,   'Q1',             '25th percentile') +
+    sc(fmt(st.q3) + ' ' + unit,   'Q3',             '75th percentile') +
+    sc(fmt(st.iqr) + ' ' + unit,  'IQR',            'Q3 − Q1') +
+    sc(fmt(st.skew),               'Skewness',       '0 = symmetric') +
+    sc(st.outliers.length,         'Outliers',       'Beyond ±3σ', st.outliers.length > 0 ? 'warn' : '');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Compare table
+// ─────────────────────────────────────────────────────────────────────────────
+function renderCompare(a, b) {
+  const isWeight = measureMode === 'weight';
+  const unit = isWeight ? 'g' : 'mm';
+  const label = isWeight ? 'Weight' : 'Width';
+  const nA = (document.getElementById('nameA').value || 'Sample A').trim();
+  const nB = (document.getElementById('nameB').value || 'Sample B').trim();
+  document.getElementById('compareHeadTitle').textContent = nA + ' vs ' + nB + ' Comparison';
+
+  const rows = [
+    ['n', a.n, b.n, 'higher'],
+    [`Mean ${label} (${unit})`, fmt(a.mean), fmt(b.mean), null],
+    [`Range (${unit})`, fmt(a.range), fmt(b.range), 'lower'],
+    [`SD sample (${unit})`, fmt(a.sdS), fmt(b.sdS), 'lower'],
+    ['CV%', fmt(a.cvPct)+'%', fmt(b.cvPct)+'%', 'lower'],
+    ['U%', fmt(a.uPct)+'%', fmt(b.uPct)+'%', 'lower'],
+    ['MIU%', fmt(a.miu)+'%', fmt(b.miu)+'%', 'lower'],
+    [`UCL (${unit})`, fmt(a.ucl), fmt(b.ucl), null],
+    [`LCL (${unit})`, fmt(Math.max(0,a.lcl)), fmt(Math.max(0,b.lcl)), null],
+    [`Q1 (${unit})`, fmt(a.q1), fmt(b.q1), null],
+    [`Q3 (${unit})`, fmt(a.q3), fmt(b.q3), null],
+    [`IQR (${unit})`, fmt(a.iqr), fmt(b.iqr), 'lower'],
+    ['Skewness', fmt(a.skew), fmt(b.skew), null],
+    ['Outliers', a.outliers.length, b.outliers.length, 'lower'],
+    ['Quality', a.quality, b.quality, null],
+  ];
+
+  const tbody = document.getElementById('compareTableBody');
+  tbody.innerHTML = rows.map(([lbl, va, vb, prefer]) => {
+    let better = '—';
+    if (prefer) {
+      const na = parseFloat(va), nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb) && na !== nb) {
+        if (prefer === 'lower') better = na < nb ? '<span style="color:#1D9E75;">A ✓</span>' : '<span style="color:#8a4fa0;">B ✓</span>';
+        else better = na > nb ? '<span style="color:#1D9E75;">A ✓</span>' : '<span style="color:#8a4fa0;">B ✓</span>';
+      }
+    }
+    return `<tr>
+      <td>${lbl}</td>
+      <td class="val-a">${va}</td>
+      <td class="val-b">${vb}</td>
+      <td>${better}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Control chart
+// ─────────────────────────────────────────────────────────────────────────────
+function drawControlChart(st, set) {
+  const canvas = document.getElementById('controlChartCanvas' + (set || 'A'));
+  const W = canvas.offsetWidth || 700;
+  const H = 200;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const isWeight = measureMode === 'weight';
+  const unit = isWeight ? 'g' : 'mm';
+
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  const padL = 56, padR = 16, padT = 16, padB = 30;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const vals = st.values;
+  const allVals = [st.ucl, Math.max(0, st.lcl), ...vals];
+  const minV = Math.min(...allVals) * 0.97;
+  const maxV = Math.max(...allVals) * 1.03;
+  const span = maxV - minV || 1;
+
+  function px(i) { return padL + (i / (vals.length - 1)) * plotW; }
+  function py(v) { return padT + plotH - ((v - minV) / span) * plotH; }
+
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (i / 4) * plotH;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
+  }
+
+  function hline(v, color, dash=[]) {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.setLineDash(dash);
+    ctx.beginPath(); ctx.moveTo(padL, py(v)); ctx.lineTo(W-padR, py(v)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  hline(st.ucl, '#E24B4A', [4,3]);
+  hline(Math.max(0, st.lcl), '#E24B4A', [4,3]);
+  hline(st.mean, '#5DCAA5', []);
+
+  ctx.fillStyle = '#888';
+  ctx.font = '9px Arial';
+  ctx.textAlign = 'right';
+  ctx.fillText('UCL ' + fmt(st.ucl) + unit, padL - 3, py(st.ucl) + 3);
+  ctx.fillText('X̄ ' + fmt(st.mean) + unit, padL - 3, py(st.mean) + 3);
+  if (st.lcl > 0) ctx.fillText('LCL ' + fmt(st.lcl) + unit, padL - 3, py(st.lcl) + 3);
+
+  ctx.strokeStyle = '#5DCAA5';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  vals.forEach((v, i) => {
+    i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v));
+  });
+  ctx.stroke();
+
+  vals.forEach((v, i) => {
+    const isOut = st.outliers.includes(i);
+    ctx.beginPath();
+    ctx.arc(px(i), py(v), isOut ? 5 : 3, 0, 2*Math.PI);
+    ctx.fillStyle = isOut ? '#E24B4A' : '#5DCAA5';
+    ctx.fill();
+  });
+
+  ctx.fillStyle = '#666';
+  ctx.font = '9px Arial';
+  ctx.textAlign = 'center';
+  const step = Math.ceil(vals.length / 10);
+  vals.forEach((_, i) => {
+    if (i % step === 0 || i === vals.length - 1) {
+      ctx.fillText(i+1, px(i), H - 8);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Histogram
+// ─────────────────────────────────────────────────────────────────────────────
+function drawHistogram(st, set) {
+  const canvas = document.getElementById('histCanvas' + (set || 'A'));
+  const W = canvas.offsetWidth || 700;
+  const H = 160;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#faf9f6';
+  ctx.fillRect(0, 0, W, H);
+
+  const bins = Math.min(30, Math.max(7, Math.round(1 + 3.322 * Math.log10(st.n))));
+  const min = st.sorted[0], max = st.sorted[st.n-1];
+  const binW = (max - min) / bins || 1;
+  const counts = new Array(bins).fill(0);
+  st.values.forEach(v => {
+    let b = Math.floor((v - min) / binW);
+    if (b >= bins) b = bins - 1;
+    counts[b]++;
+  });
+  const maxCount = Math.max(...counts, 1);
+
+  const padL = 42, padR = 14, padT = 16, padB = 28;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const bw = plotW / bins;
+
+  counts.forEach((c, i) => {
+    const barH = (c / maxCount) * plotH;
+    const x = padL + i * bw;
+    const binCenter = min + (i + 0.5) * binW;
+    const distFromMean = Math.abs(binCenter - st.mean) / st.sdS;
+    const color = distFromMean <= 1 ? '#1D9E75' : distFromMean <= 2 ? '#BA7517' : '#E24B4A';
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 1, padT + plotH - barH, bw - 2, barH);
+    if (c > 0) {
+      ctx.fillStyle = '#6b6a64';
+      ctx.font = '9px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(c, x + bw/2, padT + plotH - barH - 3);
+    }
+  });
+
+  const meanX = padL + ((st.mean - min) / (max - min || 1)) * plotW;
+  ctx.strokeStyle = '#185fa5';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(meanX, padT); ctx.lineTo(meanX, padT + plotH); ctx.stroke();
+  ctx.fillStyle = '#185fa5';
+  ctx.font = '9px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('X̄', meanX, padT - 2);
+
+  // X-axis labels — min, quartiles, max with proper alignment so edges aren't clipped
+  ctx.font = '9px Arial';
+  ctx.fillStyle = '#9a9890';
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    const v = min + f * (max - min);
+    const x = padL + f * plotW;
+    ctx.textAlign = f === 0 ? 'left' : f === 1 ? 'right' : 'center';
+    ctx.fillText(fmt(v), x, H - 8);
+  });
+
+  // X-axis label line
+  ctx.strokeStyle = '#e4e1d9';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(padL, padT + plotH);
+  ctx.lineTo(padL + plotW, padT + plotH);
+  ctx.stroke();
+
+  // Y-axis: frequency count labels on left
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#9a9890';
+  [0, 0.5, 1].forEach(f => {
+    const count = Math.round(f * maxCount);
+    const y = padT + plotH - f * plotH;
+    ctx.fillText(count, padL - 3, y + 3);
+    ctx.strokeStyle = '#ece9e0';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Distribution bar
+// ─────────────────────────────────────────────────────────────────────────────
+function renderDistBar(st, set) {
+  const s = set || 'A';
+  document.getElementById('distBarWrap' + s).style.display = '';
+  const p1 = st.pct1, p2 = st.pct2 - st.pct1, p3 = st.pct3 - st.pct2, p4 = 100 - st.pct3;
+  document.getElementById('seg1' + s).style.width = p1 + '%';
+  document.getElementById('seg2' + s).style.width = p2 + '%';
+  document.getElementById('seg3' + s).style.width = p3 + '%';
+  document.getElementById('seg4' + s).style.width = p4 + '%';
+  document.getElementById('pct1s' + s).textContent = fmt(st.pct1);
+  document.getElementById('pct2s' + s).textContent = fmt(st.pct2);
+  document.getElementById('pct3s' + s).textContent = fmt(st.pct3);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BATCH — save / load / render
+// ─────────────────────────────────────────────────────────────────────────────
+function loadBatchFromStorage() {
+  try {
+    const raw = sessionStorage.getItem('mva_batch_entries');
+    batchEntries = raw ? JSON.parse(raw) : [];
+  } catch(e) { batchEntries = []; }
+}
+
+function saveBatchToStorage() {
+  try {
+    sessionStorage.setItem('mva_batch_entries', JSON.stringify(batchEntries));
+  } catch(e) {}
+}
+
+function saveToBatch() {
+  if (!statsA && !statsB) {
+    alert('Run an analysis first before saving to batch.');
+    return;
+  }
+  const ts = new Date().toLocaleString();
+  const entry = {
+    id: Date.now(),
+    ts,
+    mode: measureMode,
+    samples: []
+  };
+  ['A','B'].forEach(s => {
+    const st = s === 'A' ? statsA : statsB;
+    if (!st) return;
+    const name = (document.getElementById('name' + s).value || ('Sample ' + s)).trim();
+    const notes = document.getElementById('notes' + s).value.trim();
+    const machine = document.getElementById('machine' + s).value || null;
+    const cl = parseFloat(document.getElementById('cutLength' + s).value);
+    entry.samples.push({ set: s, name, notes, machine, cutLength: isNaN(cl) ? null : cl, stats: {
+      n: st.n, mean: st.mean, range: st.range, sdS: st.sdS, sdP: st.sdP,
+      ucl: st.ucl, lcl: st.lcl, cvPct: st.cvPct, uPct: st.uPct, miu: st.miu,
+      q1: st.q1, q3: st.q3, iqr: st.iqr, skew: st.skew, quality: st.quality,
+      outliers: st.outliers.length, pct1: st.pct1, pct2: st.pct2, pct3: st.pct3
+    }});
+  });
+  batchEntries.unshift(entry);
+  saveBatchToStorage();
+  alert('Saved to batch (' + entry.samples.map(s=>s.name).join(', ') + ')');
+}
+
+function renderBatchView() {
+  const log = document.getElementById('batchLog');
+  if (!batchEntries.length) {
+    log.innerHTML = '<div class="batch-empty">No entries saved yet. Run an analysis and click "Save to Batch".</div>';
+    document.getElementById('batchCompareCard').style.display = 'none';
+    return;
+  }
+
+  const unit = (e) => e.mode === 'weight' ? 'g' : 'mm';
+  log.innerHTML = batchEntries.map(entry => {
+    const u = unit(entry);
+    const sampleInfo = entry.samples.map(s =>
+      `<span class="quality-badge ${s.stats.quality === 'Good' ? 'qb-good' : s.stats.quality === 'Moderate' ? 'qb-moderate' : 'qb-poor'}" style="font-size:11px;">${s.name}: ${s.stats.quality}</span>`
+    ).join(' ');
+    const cvInfo = entry.samples.map(s => `CV%: ${fmt(s.stats.cvPct)}`).join(' | ');
+    const meanInfo = entry.samples.map(s => `Mean: ${fmt(s.stats.mean)}${u}`).join(' | ');
+    const cutTxt = entry.samples.map(s => s.cutLength ? s.name + ' cut: ' + s.cutLength + 'cm' : '').filter(Boolean).join(', ');
+    const machineTxt = entry.samples.map(s => s.machine ? s.name + ': ' + s.machine : '').filter(Boolean).join(', ');
+    return `<div class="batch-entry">
+      <div class="batch-entry-info">
+        <div class="batch-entry-title">${entry.ts}</div>
+        <div class="batch-entry-meta">${entry.mode === 'weight' ? 'Weight (g)' : 'Width (mm)'}${machineTxt ? ' · ' + escapeHtml(machineTxt) : ''}${cutTxt ? ' · ' + cutTxt : ''} · ${cvInfo} · ${meanInfo}</div>
+        <div class="batch-entry-badges" style="margin-top:4px;">${sampleInfo}</div>
+      </div>
+      <div class="batch-entry-actions">
+        <button class="btn-secondary" onclick="viewBatchEntry(${entry.id})">View</button>
+        <button class="btn-danger" onclick="deleteBatchEntry(${entry.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderBatchCompare();
+}
+
+// ── Context-based draw helpers for batch entry modal ─────────────────────────
+// These mirror drawControlChart / drawHistogram but take a ctx+dimensions
+// directly so they can render into modal canvases without fixed IDs.
+
+function drawCanvasControlChart(ctx, st, W, H, mode) {
+  const unit = mode === 'weight' ? 'g' : 'mm';
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+  const padL = 56, padR = 16, padT = 16, padB = 30;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const vals = st.values;
+  const allVals = [st.ucl, Math.max(0, st.lcl), ...vals];
+  const minV = Math.min(...allVals) * 0.97;
+  const maxV = Math.max(...allVals) * 1.03;
+  const span = maxV - minV || 1;
+  function px(i) { return padL + (i / (vals.length - 1 || 1)) * plotW; }
+  function py(v) { return padT + plotH - ((v - minV) / span) * plotH; }
+  ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (i / 4) * plotH;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+  }
+  function hline(v, color, dash) {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.setLineDash(dash || []);
+    ctx.beginPath(); ctx.moveTo(padL, py(v)); ctx.lineTo(W - padR, py(v)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  hline(st.ucl, '#E24B4A', [4, 3]);
+  hline(Math.max(0, st.lcl), '#E24B4A', [4, 3]);
+  hline(st.mean, '#5DCAA5');
+  ctx.fillStyle = '#888'; ctx.font = '9px Arial'; ctx.textAlign = 'right';
+  ctx.fillText('UCL ' + fmt(st.ucl) + unit, padL - 3, py(st.ucl) + 3);
+  ctx.fillText('X̄ ' + fmt(st.mean) + unit, padL - 3, py(st.mean) + 3);
+  if (st.lcl > 0) ctx.fillText('LCL ' + fmt(st.lcl) + unit, padL - 3, py(st.lcl) + 3);
+  ctx.strokeStyle = '#5DCAA5'; ctx.lineWidth = 1.5; ctx.beginPath();
+  vals.forEach((v, i) => { i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v)); });
+  ctx.stroke();
+  vals.forEach((v, i) => {
+    const isOut = Array.isArray(st.outliers) ? st.outliers.includes(i) : false;
+    ctx.beginPath(); ctx.arc(px(i), py(v), isOut ? 5 : 3, 0, 2 * Math.PI);
+    ctx.fillStyle = isOut ? '#E24B4A' : '#5DCAA5'; ctx.fill();
+  });
+  ctx.fillStyle = '#666'; ctx.font = '9px Arial'; ctx.textAlign = 'center';
+  const step = Math.max(1, Math.ceil(vals.length / 10));
+  vals.forEach((_, i) => { if (i % step === 0 || i === vals.length - 1) ctx.fillText(i + 1, px(i), H - 8); });
+}
+
+function drawCanvasHistogram(ctx, st, W, H, mode) {
+  ctx.fillStyle = '#faf9f6'; ctx.fillRect(0, 0, W, H);
+  const bins = Math.min(30, Math.max(7, Math.round(1 + 3.322 * Math.log10(st.n))));
+  const sorted = st.sorted || [...st.values].sort((a, b) => a - b);
+  const min = sorted[0], max = sorted[sorted.length - 1];
+  const binW = (max - min) / bins || 1;
+  const counts = new Array(bins).fill(0);
+  st.values.forEach(v => { let b = Math.floor((v - min) / binW); if (b >= bins) b = bins - 1; counts[b]++; });
+  const maxCount = Math.max(...counts, 1);
+  const padL = 42, padR = 14, padT = 16, padB = 28;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const bw = plotW / bins;
+  counts.forEach((c, i) => {
+    const barH = (c / maxCount) * plotH;
+    const x = padL + i * bw;
+    const binCenter = min + (i + 0.5) * binW;
+    const dist = Math.abs(binCenter - st.mean) / (st.sdS || 1);
+    ctx.fillStyle = dist <= 1 ? '#1D9E75' : dist <= 2 ? '#BA7517' : '#E24B4A';
+    ctx.fillRect(x + 1, padT + plotH - barH, bw - 2, barH);
+    if (c > 0) { ctx.fillStyle = '#6b6a64'; ctx.font = '9px Arial'; ctx.textAlign = 'center'; ctx.fillText(c, x + bw / 2, padT + plotH - barH - 3); }
+  });
+  const meanX = padL + ((st.mean - min) / (max - min || 1)) * plotW;
+  ctx.strokeStyle = '#185fa5'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(meanX, padT); ctx.lineTo(meanX, padT + plotH); ctx.stroke();
+  ctx.fillStyle = '#185fa5'; ctx.font = '9px Arial'; ctx.textAlign = 'center'; ctx.fillText('X̄', meanX, padT - 2);
+  ctx.font = '9px Arial'; ctx.fillStyle = '#9a9890';
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    const v = min + f * (max - min);
+    const x = padL + f * plotW;
+    ctx.textAlign = f === 0 ? 'left' : f === 1 ? 'right' : 'center';
+    ctx.fillText(fmt(v), x, H - 8);
+  });
+  ctx.strokeStyle = '#e4e1d9'; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(padL, padT + plotH); ctx.lineTo(padL + plotW, padT + plotH); ctx.stroke();
+  ctx.textAlign = 'right'; ctx.fillStyle = '#9a9890';
+  [0, 0.5, 1].forEach(f => {
+    const count = Math.round(f * maxCount);
+    const y = padT + plotH - f * plotH;
+    ctx.fillText(count, padL - 3, y + 3);
+    ctx.strokeStyle = '#ece9e0'; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+  });
+}
+
+function viewBatchEntry(id) {
+  const entry = batchEntries.find(e => e.id === id);
+  if (!entry) return;
+  const u = entry.mode === 'weight' ? 'g' : 'mm';
+  const label = entry.mode === 'weight' ? 'Weight' : 'Width';
+  let html = `<div style="font-size:13px;color:#6b6a64;margin-bottom:0.75rem;">${entry.ts} · ${entry.mode === 'weight' ? 'Weight (g)' : 'Width (mm)'}</div>`;
+  entry.samples.forEach((s, si) => {
+    const st = s.stats;
+    const qcls = { Good: 'qb-good', Moderate: 'qb-moderate', Poor: 'qb-poor' };
+    const cid = `batchModal_${id}_${si}`;
+    html += `<div style="margin-bottom:1.5rem;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <strong style="font-size:14px;">${s.name}</strong>
+        ${s.machine ? `<span style="font-size:11px;background:#eef2f7;color:#185fa5;padding:2px 8px;border-radius:10px;">${escapeHtml(s.machine)}</span>` : ''}
+        <span class="quality-badge ${qcls[st.quality]}">${st.quality}</span>
+      </div>
+      <div class="stat-grid-wa">
+        <div class="stat-card"><div class="stat-val">${st.n}</div><div class="stat-lbl">Measurements</div></div>
+        <div class="stat-card"><div class="stat-val">${fmt(st.mean)}${u}</div><div class="stat-lbl">Mean ${label}</div></div>
+        <div class="stat-card"><div class="stat-val">${fmt(st.range)}${u}</div><div class="stat-lbl">Range</div></div>
+        <div class="stat-card ${st.cvPct < 5 ? '' : st.cvPct < 12 ? 'warn' : 'danger'}"><div class="stat-val">${fmt(st.cvPct)}%</div><div class="stat-lbl">CV%</div></div>
+        <div class="stat-card ${st.uPct < 4 ? '' : st.uPct < 10 ? 'warn' : 'danger'}"><div class="stat-val">${fmt(st.uPct)}%</div><div class="stat-lbl">U%</div></div>
+        <div class="stat-card"><div class="stat-val">${fmt(st.miu)}%</div><div class="stat-lbl">MIU%</div></div>
+        <div class="stat-card"><div class="stat-val">${fmt(st.sdS)}${u}</div><div class="stat-lbl">SD</div></div>
+        <div class="stat-card"><div class="stat-val">${fmt(st.iqr)}${u}</div><div class="stat-lbl">IQR</div></div>
+        <div class="stat-card ${st.outliers > 0 ? 'warn' : ''}"><div class="stat-val">${st.outliers}</div><div class="stat-lbl">Outliers</div></div>
+      </div>
+      ${s.notes ? `<div style="font-size:12px;color:#6b6a64;margin-top:6px;">Notes: ${s.notes}</div>` : ''}
+      <div style="margin-top:1rem;">
+        <div style="font-size:12px;font-weight:600;color:#1d1d1b;margin-bottom:4px;">Control Chart</div>
+        <canvas id="cc_${cid}" style="width:100%;border-radius:6px;display:block;"></canvas>
+      </div>
+      <div style="margin-top:1rem;">
+        <div style="font-size:12px;font-weight:600;color:#1d1d1b;margin-bottom:4px;">Distribution — ${s.name}</div>
+        <canvas id="hist_${cid}" style="width:100%;border-radius:6px;display:block;"></canvas>
+      </div>
+    </div>`;
+  });
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `<div style="background:#fff;border-radius:12px;padding:1.5rem;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <h2 style="font-size:16px;font-weight:700;margin:0;">Batch Entry Detail</h2>
+      <button onclick="this.closest('div[style]').remove()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#6b6a64;">×</button>
+    </div>
+    ${html}
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+  // Draw charts into the modal canvases after they're in the DOM
+  entry.samples.forEach((s, si) => {
+    const st = s.stats;
+    const cid = `batchModal_${id}_${si}`;
+
+    const ccCanvas = document.getElementById('cc_' + cid);
+    const histCanvas = document.getElementById('hist_' + cid);
+
+    // Control chart
+    if (ccCanvas && st.values && st.values.length) {
+      const W = ccCanvas.offsetWidth || 640;
+      const H = 200;
+      ccCanvas.width = W; ccCanvas.height = H;
+      drawCanvasControlChart(ccCanvas.getContext('2d'), st, W, H, entry.mode);
+    }
+
+    // Histogram
+    if (histCanvas && st.values && st.values.length) {
+      const W = histCanvas.offsetWidth || 640;
+      const H = 160;
+      histCanvas.width = W; histCanvas.height = H;
+      drawCanvasHistogram(histCanvas.getContext('2d'), st, W, H, entry.mode);
+    }
+  });
+}
+
+function deleteBatchEntry(id) {
+  batchEntries = batchEntries.filter(e => e.id !== id);
+  saveBatchToStorage();
+  renderBatchView();
+}
+
+function clearAllBatch() {
+  if (!confirm('Clear all batch entries?')) return;
+  batchEntries = [];
+  saveBatchToStorage();
+  renderBatchView();
+}
+
+function renderBatchCompare() {
+  const card = document.getElementById('batchCompareCard');
+  if (batchEntries.length < 2) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const recent = batchEntries.slice(0, Math.min(8, batchEntries.length));
+  // Draw a simple CV% bar comparison
+  const content = document.getElementById('batchCompareContent');
+  const maxCV = Math.max(...recent.flatMap(e => e.samples.map(s => s.stats.cvPct)), 1);
+  content.innerHTML = `
+    <p style="font-size:12px;color:#6b6a64;margin-bottom:0.75rem;">CV% comparison across recent entries (most recent first)</p>
+    ${recent.map(entry => {
+      return entry.samples.map(s => {
+        const pct = (s.stats.cvPct / maxCV) * 100;
+        const color = s.stats.cvPct < 5 ? '#1D9E75' : s.stats.cvPct < 12 ? '#BA7517' : '#E24B4A';
+        return `<div style="margin-bottom:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+            <span style="font-size:12px;color:#1d1d1b;font-weight:500;">${s.name} <span style="color:#9a9890;font-weight:400;">${entry.ts}</span></span>
+            <span style="font-size:12px;font-weight:700;color:${color};">${fmt(s.stats.cvPct)}%</span>
+          </div>
+          <div style="height:8px;border-radius:4px;background:#f0ede6;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${color};border-radius:4px;transition:width 0.4s;"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }).join('')}
+  `;
+}
+
+function exportBatchCSV() {
+  if (!batchEntries.length) { alert('No entries to export.'); return; }
+  const rows = [['Timestamp','Mode','Cut Length (cm)','Sample','Notes','n','Mean','Range','SD','CV%','U%','MIU%','UCL','LCL','Q1','Q3','IQR','Skewness','Outliers','Quality']];
+  batchEntries.forEach(entry => {
+    entry.samples.forEach(s => {
+      const st = s.stats;
+      rows.push([
+        entry.ts, entry.mode, entry.cutLength ?? '', s.name, s.notes,
+        st.n, fmt(st.mean), fmt(st.range), fmt(st.sdS),
+        fmt(st.cvPct), fmt(st.uPct), fmt(st.miu),
+        fmt(st.ucl), fmt(Math.max(0,st.lcl)),
+        fmt(st.q1), fmt(st.q3), fmt(st.iqr),
+        fmt(st.skew), st.outliers, st.quality
+      ]);
+    });
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mass_variation_batch.csv';
+  a.click();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRENDS view
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// TRENDS helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getEntryDateKey(entry, groupBy) {
+  // entry.ts is a locale string — parse it via Date
+  const d = new Date(entry.id); // id = Date.now() at save time, reliable
+  if (groupBy === 'day')   return d.toLocaleDateString();
+  if (groupBy === 'month') return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+  if (groupBy === 'year')  return String(d.getFullYear());
+  return null; // individual
+}
+
+function populateCutLengthDropdown() {
+  const sel = document.getElementById('trendCutLenSel');
+  const current = sel.value;
+  // Collect all unique cut lengths across all entries/samples
+  const lengths = new Set();
+  batchEntries.forEach(e => e.samples.forEach(s => {
+    if (s.cutLength != null) lengths.add(String(s.cutLength));
+  }));
+  // Rebuild options
+  sel.innerHTML = '<option value="all">All cut lengths</option>';
+  [...lengths].sort((a,b) => parseFloat(a)-parseFloat(b)).forEach(l => {
+    const opt = document.createElement('option');
+    opt.value = l;
+    opt.textContent = l + ' cm';
+    sel.appendChild(opt);
+  });
+  if (current && current !== 'all') sel.value = current;
+}
+
+async function populateMachineDropdown() {
+  const sel = document.getElementById('trendMachineSel');
+  const current = sel.value;
+  // Use the same shared machine list as the analysis dropdowns (default +
+  // custom machines), so the filter list stays consistent app-wide — but
+  // only show ones that actually appear in saved batch entries, plus
+  // "Unspecified" if any sample was saved without a machine selected.
+  const usedNames = new Set();
+  let hasUnspecified = false;
+  batchEntries.forEach(e => e.samples.forEach(s => {
+    if (s.machine) usedNames.add(s.machine); else hasUnspecified = true;
+  }));
+  const machines = await fetchMachines();
+  sel.innerHTML = '<option value="all">All machines</option>';
+  machines.filter(m => usedNames.has(m.name)).forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name;
+    sel.appendChild(opt);
+  });
+  if (hasUnspecified) {
+    const opt = document.createElement('option');
+    opt.value = '__unspecified__';
+    opt.textContent = 'Unspecified';
+    sel.appendChild(opt);
+  }
+  if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+}
+
+function getFilteredSamples() {
+  const cutFilter = document.getElementById('trendCutLenSel').value;
+  const groupBy   = document.getElementById('trendTimeSel').value;
+  const metric    = document.getElementById('trendMetricSel').value;
+  const machineFilter = document.getElementById('trendMachineSel').value;
+
+  // Flat list of { label, xKey, value, quality, sampleName, cutLength, ts }
+  let rows = [];
+  [...batchEntries].reverse().forEach(entry => {
+    entry.samples.forEach(s => {
+      if (cutFilter !== 'all' && String(s.cutLength) !== cutFilter) return;
+      if (machineFilter !== 'all') {
+        const sMachine = s.machine || '__unspecified__';
+        if (sMachine !== machineFilter) return;
+      }
+      const xKey = groupBy === 'individual'
+        ? (s.name + '\n' + entry.ts)
+        : getEntryDateKey(entry, groupBy);
+      rows.push({
+        xKey,
+        label: s.name,
+        ts: entry.ts,
+        entryId: entry.id,
+        machine: s.machine || null,
+        value: s.stats[metric],
+        quality: s.stats.quality,
+        cutLength: s.cutLength,
+        mode: entry.mode,
+        stats: s.stats
+      });
+    });
+  });
+
+  if (groupBy === 'individual') {
+    // Priority ordering only makes sense once results are narrowed to a
+    // specific machine (otherwise "machine stage" order has nothing to do,
+    // since every row could be a different machine already in save order).
+    if (machineFilter !== 'all') {
+      const priority = document.getElementById('trendMachinePrioritySel').value;
+      rows = sortByMachinePriority(
+        rows, priority,
+        (r) => r.machine,
+        (r) => r.entryId
+      );
+    }
+    return rows;
+  }
+
+  // Group by xKey — average the metric value per group
+  const groups = {};
+  rows.forEach(r => {
+    if (!groups[r.xKey]) groups[r.xKey] = { xKey: r.xKey, values: [], rows: [] };
+    groups[r.xKey].values.push(r.value);
+    groups[r.xKey].rows.push(r);
+  });
+  return Object.values(groups).map(g => {
+    const avg = g.values.reduce((a,b) => a+b, 0) / g.values.length;
+    const best = g.rows[0];
+    return { ...best, value: avg, label: g.xKey };
+  });
+}
+
+async function renderTrendView() {
+  populateCutLengthDropdown();
+  await populateMachineDropdown();
+  syncMachinePriorityState();
+  renderTrendChart();
+  renderTrendEntriesList();
+}
+
+function syncMachinePriorityState() {
+  const machineFilter = document.getElementById('trendMachineSel').value;
+  const groupBy = document.getElementById('trendTimeSel').value;
+  const prioritySel = document.getElementById('trendMachinePrioritySel');
+  const isActive = machineFilter !== 'all' && groupBy === 'individual';
+  prioritySel.style.opacity = isActive ? '1' : '0.55';
+}
+
+function onTrendFilterChange() {
+  syncMachinePriorityState();
+  renderTrendChart();
+  renderTrendEntriesList();
+}
+
+function renderTrendChart() {
+  const canvas  = document.getElementById('trendCanvas');
+  const emptyEl = document.getElementById('trendEmpty');
+  const legend  = document.getElementById('trendLegend');
+  const infoEl  = document.getElementById('trendFilterInfo');
+  const metric  = document.getElementById('trendMetricSel').value;
+  const groupBy = document.getElementById('trendTimeSel').value;
+  const cutFilter = document.getElementById('trendCutLenSel').value;
+  const machineFilter = document.getElementById('trendMachineSel').value;
+
+  const metricLabels = {
+    cvPct:'CV%', uPct:'U%', miu:'MIU%', mean:'Mean',
+    sdS:'SD (sample)', sdP:'SD (population)', range:'Range', iqr:'IQR', skew:'Skewness'
+  };
+
+  const points = getFilteredSamples();
+
+  // Info line
+  const cutInfo = cutFilter === 'all' ? 'all cut lengths' : cutFilter + ' cm cut length';
+  const groupInfo = groupBy === 'individual' ? 'individual logs' : 'grouped by ' + groupBy;
+  const machineInfo = machineFilter === 'all' ? 'all machines' : (machineFilter === '__unspecified__' ? 'unspecified machine' : machineFilter);
+  infoEl.textContent = `Showing ${metricLabels[metric]} · ${cutInfo} · ${machineInfo} · ${groupInfo} · ${points.length} data point${points.length !== 1 ? 's' : ''}`;
+
+  if (!points.length) {
+    canvas.style.display = 'none';
+    emptyEl.style.display = '';
+    legend.innerHTML = '';
+    return;
+  }
+  canvas.style.display = '';
+  emptyEl.style.display = 'none';
+
+  const W = canvas.offsetWidth || 700;
+  const H = 180;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  const padL = 52, padR = 16, padT = 20, padB = 36;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const vals = points.map(p => p.value);
+  const minV = Math.min(...vals);
+  const maxV = Math.max(...vals);
+  const pad  = (maxV - minV) * 0.12 || 0.5;
+  const lo   = minV - pad;
+  const hi   = maxV + pad;
+  const span = hi - lo || 1;
+
+  function px(i) { return padL + (i / Math.max(vals.length - 1, 1)) * plotW; }
+  function py(v) { return padT + plotH - ((v - lo) / span) * plotH; }
+
+  // Grid lines + Y labels
+  ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (i / 4) * plotH;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    const v = hi - (i / 4) * span;
+    ctx.fillStyle = '#666'; ctx.font = '9px Arial'; ctx.textAlign = 'right';
+    ctx.fillText(fmt(v, 2), padL - 4, y + 3);
+  }
+
+  // Shade band between min and max if grouped
+  if (groupBy !== 'individual' && vals.length > 1) {
+    const yTop = py(maxV), yBot = py(minV);
+    ctx.fillStyle = 'rgba(93,202,165,0.08)';
+    ctx.fillRect(padL, yTop, plotW, yBot - yTop);
+  }
+
+  // Line
+  ctx.strokeStyle = '#5DCAA5'; ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  vals.forEach((v, i) => i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v)));
+  ctx.stroke();
+
+  // Dots
+  vals.forEach((v, i) => {
+    const color = points[i].quality === 'Good' ? '#1D9E75' : points[i].quality === 'Moderate' ? '#BA7517' : '#E24B4A';
+    ctx.beginPath(); ctx.arc(px(i), py(v), 5, 0, 2 * Math.PI);
+    ctx.fillStyle = color; ctx.fill();
+    // value label above dot
+    ctx.fillStyle = '#ccc'; ctx.font = '8px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(fmt(v, 2), px(i), py(v) - 8);
+  });
+
+  // X labels
+  ctx.fillStyle = '#666'; ctx.font = '9px Arial';
+  const step = Math.max(1, Math.ceil(vals.length / 10));
+  vals.forEach((_, i) => {
+    if (i % step === 0 || i === vals.length - 1) {
+      const lbl = groupBy === 'individual' ? points[i].label.split('\n')[0] : points[i].xKey;
+      ctx.textAlign = i === 0 ? 'left' : i === vals.length - 1 ? 'right' : 'center';
+      // truncate long labels
+      const short = lbl.length > 12 ? lbl.slice(0, 11) + '…' : lbl;
+      ctx.fillText(short, px(i), H - 8);
+    }
+  });
+
+  // Legend
+  const qColors = { Good: '#1D9E75', Moderate: '#BA7517', Poor: '#E24B4A' };
+  legend.innerHTML = Object.entries(qColors).map(([k,c]) =>
+    `<span style="display:flex;align-items:center;gap:4px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:${c};display:inline-block;"></span>
+      <span>${k}</span>
+    </span>`
+  ).join('') + `<span style="margin-left:auto;font-size:11px;color:#6b6a64;">Y: ${metricLabels[metric]}</span>`;
+}
+
+function renderTrendEntriesList() {
+  const el      = document.getElementById('trendEntriesList');
+  const metric  = document.getElementById('trendMetricSel').value;
+  const metricLabels = {
+    cvPct:'CV%', uPct:'U%', miu:'MIU%', mean:'Mean',
+    sdS:'SD (sample)', sdP:'SD (population)', range:'Range', iqr:'IQR', skew:'Skewness'
+  };
+
+  const filtered = getFilteredSamples();
+  if (!filtered.length) {
+    el.innerHTML = '<p style="font-size:13px;color:#9a9890;">No entries match the current filters.</p>';
+    return;
+  }
+
+  const th = (t) => `<th style="text-align:left;padding:6px 8px;font-size:11px;color:#6b6a64;text-transform:uppercase;letter-spacing:0.03em;">${t}</th>`;
+  const td = (t, extra='') => `<td style="padding:5px 8px;${extra}">${t}</td>`;
+
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="border-bottom:1px solid #e4e1d9;">
+      ${th('Time')}${th('Sample')}${th('Cut (cm)')}${th('Mode')}${th(metricLabels[metric])}${th('U%')}${th('Quality')}
+    </tr></thead>
+    <tbody>
+      ${filtered.map(r => {
+        const qcls = { Good:'qb-good', Moderate:'qb-moderate', Poor:'qb-poor' };
+        const uColor = r.stats.uPct < 4 ? '#0e7a55' : r.stats.uPct < 10 ? '#8a5a00' : '#b52020';
+        return `<tr style="border-bottom:1px solid #f0ede6;">
+          ${td(r.ts, 'color:#6b6a64;')}
+          ${td(`<strong>${r.label}</strong>`)}
+          ${td(r.cutLength != null ? r.cutLength : '—')}
+          ${td(r.mode === 'weight' ? 'Weight (g)' : 'Width (mm)')}
+          ${td(fmt(r.value), 'font-weight:600;color:#185fa5;')}
+          ${td(fmt(r.stats.uPct) + '%', `font-weight:600;color:${uColor};`)}
+          ${td(`<span class="quality-badge ${qcls[r.stats.quality]}" style="font-size:11px;">${r.stats.quality}</span>`)}
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utility
+// ─────────────────────────────────────────────────────────────────────────────
+function fmt(v, dec=3) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return parseFloat(v.toFixed(dec)).toString();
+}
+</script>
+</body>
+</html>

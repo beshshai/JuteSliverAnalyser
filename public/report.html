@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report — Jute sliver analyzer</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 0.5rem;
+  }
+  .stat-box {
+    background: #faf9f6; border: 1px solid #e4e1d9; border-radius: 8px;
+    padding: 0.85rem 1rem;
+  }
+  .stat-box .stat-value { font-size: 22px; font-weight: 600; }
+  .stat-box .stat-label { font-size: 12px; color: #6b6a64; margin-top: 2px; }
+
+  .viz-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+  .viz-col { flex: 1; min-width: 260px; }
+  .viz-col h3 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .viz-col p.viz-note { font-size: 12px; color: #6b6a64; margin-top: 6px; }
+
+  .back-link { font-size: 13px; margin-bottom: 0.75rem; display: inline-block; }
+
+  /* ODF styles */
+  .odf-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+  .odf-metric-box {
+    background: #f0ede6; border: 1px solid #dbd8d0; border-radius: 8px;
+    padding: 0.8rem 1rem;
+  }
+  .odf-metric-box .odf-val { font-size: 20px; font-weight: 700; color: #1d1d1b; }
+  .odf-metric-box .odf-lbl { font-size: 11px; color: #6b6a64; margin-top: 2px; }
+  .odf-metric-box .odf-desc { font-size: 11px; color: #8a8880; margin-top: 4px; font-style: italic; }
+
+  .odf-quality-bar {
+    height: 10px; border-radius: 5px; margin-top: 6px;
+    background: linear-gradient(to right, #E24B4A 0%, #BA7517 40%, #1D9E75 80%);
+    position: relative;
+  }
+  .odf-quality-marker {
+    position: absolute; top: -3px; width: 16px; height: 16px;
+    background: #fff; border: 3px solid #1d1d1b; border-radius: 50%;
+    transform: translateX(-50%);
+  }
+
+  .polar-odf-wrap { position: relative; display: inline-block; }
+
+  /* export button */
+  .export-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; font-size: 13px; font-weight: 600;
+    background: #1D9E75; color: #fff; border: none; border-radius: 6px;
+    cursor: pointer; text-decoration: none;
+  }
+  .export-btn:hover { background: #178a63; }
+  .print-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; font-size: 13px; font-weight: 600;
+    background: #185fa5; color: #fff; border: none; border-radius: 6px;
+    cursor: pointer; text-decoration: none;
+  }
+  .print-btn:hover { background: #1450a0; }
+  .report-actions { display: flex; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
+
+  /* ── Print styles ── */
+  @media print {
+    .topbar, .back-link, .report-actions { display: none !important; }
+    body { background: #fff !important; }
+    .page { max-width: 100% !important; padding: 0.5rem 1rem !important; }
+    .card { break-inside: avoid; border: 1px solid #ccc !important; box-shadow: none !important; }
+    .stat-box { break-inside: avoid; }
+    .odf-metric-box { break-inside: avoid; }
+    canvas { max-width: 100% !important; }
+    .viz-row { flex-wrap: nowrap !important; }
+    .result-row { break-inside: avoid; }
+    .page-title { font-size: 18px !important; }
+    /* Skip uploaded sample photos when printing — only analysis/data should print */
+    .result-row img.thumb { display: none !important; }
+    /* Skip the per-sample list entirely when printing — only graphs/analysis should print */
+    .samples-section { display: none !important; }
+    /* Keep the ODF heading glued to its content card so it never gets orphaned at a page break */
+    .odf-section { break-inside: avoid !important; }
+    .odf-heading { break-after: avoid !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar" id="topbar"></div>
+
+  <div class="page">
+    <a href="#" id="backLink" class="back-link">&larr; Back</a>
+
+    <div id="reportHeader">
+      <h1 class="page-title"><span class="spinner"></span>Loading report...</h1>
+    </div>
+
+    <div id="reportActions" class="report-actions" style="display:none;"></div>
+    <div id="reportBody"></div>
+  </div>
+
+  <script src="/shared.js?v=6"></script>
+  <script>
+    function getQueryParam(name) {
+      return new URLSearchParams(window.location.search).get(name);
+    }
+
+    function statBox(value, label) {
+      return `<div class="stat-box"><div class="stat-value">${value}</div><div class="stat-label">${label}</div></div>`;
+    }
+
+    function odfMetricBox(val, label, desc) {
+      return `<div class="odf-metric-box">
+        <div class="odf-val">${val}</div>
+        <div class="odf-lbl">${label}</div>
+        ${desc ? `<div class="odf-desc">${desc}</div>` : ''}
+      </div>`;
+    }
+
+    function hermansQualityLabel(f) {
+      if (f >= 0.9)  return { label: 'Excellent', color: '#1D9E75', pct: 95 };
+      if (f >= 0.7)  return { label: 'Good',      color: '#2bae88', pct: 75 };
+      if (f >= 0.4)  return { label: 'Moderate',  color: '#BA7517', pct: 50 };
+      return               { label: 'Poor',       color: '#E24B4A', pct: 20 };
+    }
+
+    /* Draw polar ODF rose diagram */
+    function drawPolarODF(canvas, hist, meanAngle) {
+      const size = 240;
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const cx = size / 2, cy = size / 2, maxR = size / 2 - 18;
+
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, size, size);
+
+      // Grid circles
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 0.5;
+      [0.25, 0.5, 0.75, 1].forEach(f => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, maxR * f, 0, 2 * Math.PI);
+        ctx.stroke();
+      });
+      // Axes (0°, 45°, 90°, 135° guide lines)
+      [0, 45, 90, 135].forEach(a => {
+        const r = a * Math.PI / 180;
+        ctx.beginPath();
+        ctx.moveTo(cx + maxR * Math.cos(r), cy - maxR * Math.sin(r));
+        ctx.lineTo(cx - maxR * Math.cos(r), cy + maxR * Math.sin(r));
+        ctx.stroke();
+      });
+
+      // ODF petals
+      const n = hist.length;
+      ctx.fillStyle = 'rgba(93,202,165,0.75)';
+      ctx.beginPath();
+      hist.forEach((v, i) => {
+        const angle = (i / n) * Math.PI;  // 0..π (half circle, mirrored)
+        const r = v * maxR;
+        const x = cx + r * Math.cos(angle);
+        const y = cy - r * Math.sin(angle);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      // mirror
+      for (let i = hist.length - 1; i >= 0; i--) {
+        const angle = (i / n) * Math.PI + Math.PI;
+        const r = hist[i] * maxR;
+        const x = cx + r * Math.cos(angle);
+        const y = cy - r * Math.sin(angle);
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Mean angle line
+      const ma = meanAngle * Math.PI / 180;
+      ctx.strokeStyle = '#D85A30';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + maxR * Math.cos(ma), cy - maxR * Math.sin(ma));
+      ctx.lineTo(cx - maxR * Math.cos(ma), cy + maxR * Math.sin(ma));
+      ctx.stroke();
+
+      // Labels
+      ctx.fillStyle = '#aaa';
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('90°', cx, cy - maxR - 4);
+      ctx.fillText('90°', cx, cy + maxR + 12);
+      ctx.fillText('0°', cx + maxR + 8, cy + 4);
+      ctx.fillText('0°', cx - maxR - 8, cy + 4);
+    }
+
+    async function loadReport() {
+      const type = getQueryParam('type');
+      const id = getQueryParam('id');
+      const header = document.getElementById('reportHeader');
+      const body = document.getElementById('reportBody');
+      const actionsDiv = document.getElementById('reportActions');
+      const backLink = document.getElementById('backLink');
+
+      if (!type || !id || (type !== 'user' && type !== 'batch')) {
+        header.innerHTML = '<h1 class="page-title">Report not found</h1>';
+        body.innerHTML = '<div class="card"><div class="empty-state">Missing or invalid report parameters.</div></div>';
+        return;
+      }
+
+      backLink.href = type === 'batch' ? '/batches' : '/trends';
+
+      const res = await fetch(`/api/reports/${type}/${encodeURIComponent(id)}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        header.innerHTML = '<h1 class="page-title">Report not found</h1>';
+        body.innerHTML = `<div class="card"><div class="empty-state">${escapeHtml(data.error || 'Could not load this report.')}</div></div>`;
+        return;
+      }
+
+      const { subject, stats, samples } = data;
+
+      header.innerHTML = `
+        <h1 class="page-title">Fiber Orientation Report — ${type === 'user' ? 'Individual' : 'Batch'}: ${escapeHtml(subject.name)}</h1>
+        <p class="page-sub">
+          ${type === 'user'
+            ? 'Aggregate statistics across all samples uploaded by this person.'
+            : `Aggregate statistics for this batch${subject.ownerName ? ' · created by ' + escapeHtml(subject.ownerName) : ''}.`}
+          ${subject.notes ? ' · ' + escapeHtml(subject.notes) : ''}
+        </p>
+      `;
+
+      // Export button
+      actionsDiv.style.display = 'flex';
+      const exportUrl = `/api/export/${type}/${encodeURIComponent(id)}`;
+      actionsDiv.innerHTML = `
+        <a class="export-btn" href="${exportUrl}" download>
+          ⬇ Export to Excel (.xlsx)
+        </a>
+        <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+      `;
+
+      if (!stats.sampleCount) {
+        body.innerHTML = '<div class="card"><div class="empty-state">No samples yet — nothing to report on.</div></div>';
+        return;
+      }
+
+      // ── ODF metrics computation ─────────────────────────────────────────────
+      // avgMeanAngle is measured from cross direction (0° = horizontal in image).
+      // Herman's f requires angle from machine direction: angleMD = |90° − angleCD|
+      const avgAngleCD = stats.avgMeanAngle;
+      const avgAngleMD = Math.abs(90 - avgAngleCD);
+      const orientIdx  = (1 - stats.avgCircularVariance).toFixed(2);
+
+      // Compute Herman's f from the full histogram distribution (not just mean angle).
+      // Each bin angle is converted CD→MD, then weighted by its histogram count.
+      // f = (3·<cos²φ_MD> − 1) / 2,  <cos²φ_MD> = Σ(Hᵢ·cos²φᵢ) / ΣHᵢ
+      const hist = stats.histogram || [];
+      let hermansF;
+      const histTotal = hist.reduce((a, b) => a + b, 0);
+      if (hist.length > 0 && histTotal > 0) {
+        const binSize = 180 / hist.length;
+        let cos2Sum = 0, wSum = 0;
+        hist.forEach((w, i) => {
+          const binAngleCD = (i + 0.5) * binSize;
+          const binAngleMD = Math.abs(90 - binAngleCD);
+          cos2Sum += w * Math.cos(binAngleMD * Math.PI / 180) ** 2;
+          wSum    += w;
+        });
+        hermansF = ((3 * (cos2Sum / wSum) - 1) / 2).toFixed(2);
+      } else {
+        // fallback to mean-angle method if no histogram available
+        hermansF = ((3 * Math.cos(avgAngleMD * Math.PI / 180) ** 2 - 1) / 2).toFixed(2);
+      }
+
+      const hq = hermansQualityLabel(parseFloat(hermansF));
+
+      body.innerHTML = `
+        <div class="card">
+          <h2 style="font-size:15px;font-weight:600;margin-bottom:4px;">Summary</h2>
+          <div class="stat-grid">
+            ${statBox(stats.sampleCount, 'Samples')}
+            ${statBox(stats.avgScore, 'Avg score')}
+            ${statBox(stats.minScore, 'Min score')}
+            ${statBox(stats.maxScore, 'Max score')}
+            ${statBox(stats.avgMeanAngle + '°', 'Avg mean angle')}
+            ${statBox(stats.avgAngularStdDev + '°', 'Avg angular std dev')}
+            ${statBox(stats.avgCircularVariance, 'Avg circular variance')}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="viz-row">
+            <div class="viz-col">
+              <h3>Combined fiber orientation</h3>
+              <canvas class="viz-canvas" id="histCanvas"></canvas>
+              <p class="viz-note">Aggregate orientation histogram across all samples (weighted by edge pixel count). The orange line marks the overall average angle.</p>
+            </div>
+            <div class="viz-col">
+              <h3>Score distribution</h3>
+              <canvas class="viz-canvas" id="distCanvas" style="background:#faf9f6;"></canvas>
+              <p class="viz-note">How many samples landed in each quality band (Good ≥75, Moderate ≥50, Poor &lt;50).</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ODF Section -->
+        <div class="odf-section">
+        <h1 class="page-title odf-heading" style="margin-top:1.5rem;">Orientation Distribution Function (ODF)</h1>
+        <div class="card">
+          <p style="font-size:13px;color:#6b6a64;margin-bottom:1rem;">
+            The ODF describes how fiber angles are distributed relative to the sliver axis.
+            A sharp peak near 0° / 90° means fibers are well-parallelized (good opening).
+            A flat, broad distribution means disorganized fibers (poor opening).
+          </p>
+
+          <div class="odf-metrics-grid">
+            ${odfMetricBox(hermansF, "Herman's Orientation Factor (f)", `${hq.label} — 1.0 = perfect, 0 = random, −0.5 = perpendicular`)}
+            ${odfMetricBox(orientIdx, 'Orientation Index (R)', '1 = perfectly aligned, 0 = random')}
+            ${odfMetricBox(avgAngleCD + '°', 'Mean Fiber Angle (CD)', 'Measured from cross direction (image horizontal)')}
+            ${odfMetricBox(avgAngleMD.toFixed(1) + '°', 'Mean Fiber Angle (MD)', 'Angle from machine direction — used for Herman\'s f')}
+            ${odfMetricBox(stats.avgAngularStdDev + '°', 'Angular Std Dev', 'Lower = tighter, more parallel fibers')}
+            ${odfMetricBox(stats.avgCircularVariance, 'Circular Variance', '0 = perfect alignment, 1 = random')}
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
+            <div style="font-size:12px;color:#6b6a64;margin-bottom:4px;">Opening quality (Herman's f)</div>
+            <div class="odf-quality-bar">
+              <div class="odf-quality-marker" style="left:${Math.max(2, Math.min(98, ((parseFloat(hermansF)+0.5)/1.5)*100))}%;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#8a8880;margin-top:3px;">
+              <span>−0.5 Perpendicular</span><span>0 Random</span><span>1.0 Perfect</span>
+            </div>
+            <div style="text-align:center;margin-top:6px;">
+              <span style="font-weight:700;color:${hq.color};font-size:14px;">${hq.label}</span>
+            </div>
+          </div>
+
+          <div class="viz-row">
+            <div class="viz-col">
+              <h3>Polar ODF rose diagram</h3>
+              <canvas id="polarOdfCanvas" style="border-radius:6px;"></canvas>
+              <p class="viz-note">Rose diagram of fiber orientation. Elongated shape along 90° axis = well-aligned fibers. Circle = random. Orange line = mean angle.</p>
+            </div>
+            <div class="viz-col">
+              <h3>Linear ODF histogram</h3>
+              <canvas class="viz-canvas" id="histCanvasOdf"></canvas>
+              <p class="viz-note">Weighted orientation histogram (0°–180°). The taller and narrower the peak, the more opened and parallelized the sliver.</p>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <h1 class="page-title samples-section">Samples (${samples.length})</h1>
+        <div class="card samples-section" id="sampleListCard">
+          <div id="sampleList"></div>
+        </div>
+      `;
+
+      drawHistogramCanvas(document.getElementById('histCanvas'), stats.histogram, stats.avgMeanAngle);
+      drawScoreDistributionCanvas(document.getElementById('distCanvas'), stats.scoreDistribution);
+      drawHistogramCanvas(document.getElementById('histCanvasOdf'), stats.histogram, stats.avgMeanAngle);
+      drawPolarODF(document.getElementById('polarOdfCanvas'), stats.histogram, stats.avgMeanAngle);
+
+      const sampleList = document.getElementById('sampleList');
+      if (!samples.length) {
+        sampleList.innerHTML = '<div class="empty-state">No samples yet.</div>';
+      } else {
+        sampleList.innerHTML = '';
+        samples.forEach(s => {
+          const badge = scoreBadgeClass(s.score);
+          const color = scoreColor(s.score);
+          const row = document.createElement('div');
+          row.className = 'result-row';
+          row.innerHTML = `
+            <img class="thumb" src="${s.image_path}" alt="sample from ${escapeHtml(s.user_name)}">
+            <div class="result-meta">
+              <div class="result-meta-top">
+                <span class="uploader">${escapeHtml(s.user_name)}</span>
+                <span class="badge ${badge.cls}">${badge.label} · ${s.score}/100</span>
+              </div>
+              <div class="score-bar-bg"><div class="score-bar-fill" style="width:${s.score}%; background:${color};"></div></div>
+              <div class="result-metrics">
+                Mean angle ${s.mean_angle_deg}° · std dev ${s.angular_stddev_deg}° · CV ${s.circular_variance} · ${s.width}×${s.height}px
+                ${s.notes ? ' · ' + escapeHtml(s.notes) : ''}
+              </div>
+              <div class="result-meta-top" style="margin-top:4px;">
+                <span class="timestamp">${timeAgo(s.created_at)}</span>
+              </div>
+            </div>
+          `;
+          sampleList.appendChild(row);
+        });
+      }
+    }
+
+    (async function init() {
+      const currentUser = await initTopbar('');
+      if (!currentUser) return;
+      await loadReport();
+    })();
+  </script>
+</body>
+</html>

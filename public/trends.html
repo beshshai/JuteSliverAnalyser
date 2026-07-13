@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trends — Jute sliver analyzer</title>
+<link rel="stylesheet" href="/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="topbar" id="topbar"></div>
+
+
+  <div class="tool-shell">
+    <nav class="tool-sidebar">
+      <div class="tool-sidebar-label">Tools</div>
+      <a href="/dashboard" id="sb_fo" class="active"><span class="tool-icon">🔬</span> Fiber Orientation</a>
+      <a href="/mass-variation" class=""><span class="tool-icon">📏</span> Mass Variation</a>
+      <a href="/sliver-width" class=""><span class="tool-icon">🧵</span> Sliver Width</a>
+      <div class="tool-sidebar-sub" id="sb_fo_sub">Fiber Orientation</div>
+      <a href="/dashboard" id="sb_dash" class=""><span class="tool-icon">🖼</span> Upload &amp; Analyse</a>
+      <a href="/batches" id="sb_batches" class=""><span class="tool-icon">📦</span> Batches</a>
+      <a href="/trends" id="sb_trends" class="active"><span class="tool-icon">📈</span> Trends</a>
+    </nav>
+    <div class="tool-content">
+    <h1 class="page-title">Score trends</h1>
+    <p class="page-sub">Average parallelization score over time, and by team member.</p>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:0.75rem; flex-wrap:wrap;">
+        <span style="font-size:13px; color:#6b6a64;">Group by</span>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <select id="batchSelect" style="width:auto; min-width:180px; display:none;">
+            <option value="">All batches (averages)</option>
+          </select>
+          <select id="machineSelect" style="width:auto; min-width:180px;">
+            <option value="">All machines</option>
+          </select>
+          <select id="machinePrioritySelect" style="width:auto; min-width:160px;" title="Only affects ordering when 'Group by' is set to Machine type">
+            <option value="stage" selected>Priority: Machine stage</option>
+            <option value="logtime">Priority: Log time (oldest first)</option>
+          </select>
+          <select id="groupBySelect" style="width:auto; min-width:160px;">
+            <option value="hour">Hour</option>
+            <option value="day" selected>Day</option>
+            <option value="month">Month</option>
+            <option value="year">Year</option>
+            <option value="log">Log (every sample)</option>
+            <option value="batch">Batch</option>
+            <option value="machine">Machine type (averaged)</option>
+            <option value="machine_raw">Machine type (all entries)</option>
+          </select>
+        </div>
+      </div>
+      <div id="chartWrap">
+        <canvas id="trendChart" height="100"></canvas>
+      </div>
+    </div>
+
+    <h1 class="page-title" style="margin-top:2rem;">By team member</h1>
+    <div class="card">
+      <div id="userTable"></div>
+    </div>
+  </div>
+
+  <script src="/shared.js?v=6"></script>
+  <script>
+    let chartInstance = null;
+
+    function sortMachineRows(rows, priority) {
+      return sortByMachinePriority(
+        rows, priority,
+        (r) => r.day,
+        (r) => r.first_used ? r.first_used.replace(' ', 'T') + 'Z' : null
+      );
+    }
+
+    function formatLabel(day, groupBy) {
+      // 'day' field holds different shapes depending on groupBy:
+      // hour: "2026-06-19 14:00" | day: "2026-06-19" | month: "2026-06"
+      // year: "2026" | log/batch_log/machine_log: full timestamp from created_at
+      // batch: the batch's name (already human-readable)
+      // machine: the machine type name (already human-readable)
+      if (groupBy === 'log' || groupBy === 'batch_log' || groupBy === 'machine_log') {
+        const d = new Date(day.replace(' ', 'T') + 'Z');
+        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      }
+      if (groupBy === 'hour') {
+        const d = new Date(day.replace(' ', 'T') + ':00Z');
+        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit' });
+      }
+      if (groupBy === 'month') {
+        const [y, m] = day.split('-');
+        return new Date(Number(y), Number(m) - 1).toLocaleString(undefined, { month: 'short', year: 'numeric' });
+      }
+      // day, year, batch, machine — already human-readable as-is
+      return day;
+    }
+
+    async function loadChart(groupBy, batchId, machineName, machinePriority) {
+      const chartWrap = document.getElementById('chartWrap');
+      // machine_raw = per-sample log filtered by machine, no averaging
+      const serverGroupBy = groupBy === 'machine_raw' ? 'log' : groupBy;
+      let url = '/api/stats/summary?group_by=' + encodeURIComponent(serverGroupBy);
+      if (groupBy === 'batch_log') url += '&batch_id=' + encodeURIComponent(batchId);
+      if (groupBy === 'machine_log') url += '&machine_name=' + encodeURIComponent(machineName);
+      // for all other modes, machine dropdown acts as a filter
+      if (machineName && groupBy !== 'machine_log' && groupBy !== 'machine') {
+        url += '&machine_name=' + encodeURIComponent(machineName);
+      }
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+
+      if (!data.overTime || !data.overTime.length) {
+        chartWrap.innerHTML = '<div class="empty-state">No data yet for this selection.</div>';
+        return;
+      }
+
+      let overTime = data.overTime;
+      if (groupBy === 'machine' || groupBy === 'machine_raw') {
+        overTime = sortMachineRows(overTime, machinePriority);
+      }
+
+      chartWrap.innerHTML = '<canvas id="trendChart" height="100"></canvas>';
+      const ctx = document.getElementById('trendChart');
+      const isPerSample = groupBy === 'log' || groupBy === 'batch_log' || groupBy === 'machine_log' || groupBy === 'machine_raw';
+
+      // For machine_raw, label each entry by its machine name (+ index to distinguish duplicates)
+      const machineRawLabels = groupBy === 'machine_raw'
+        ? overTime.map((d, i) => (d.machine || 'Unknown') + ' #' + (i + 1))
+        : null;
+
+      // IMPORTANT: Chart.js's default category x-axis merges points that
+      // share an identical label string. In per-sample modes many samples
+      // can carry the same minute-resolution timestamp (e.g. a batch
+      // upload), which previously collapsed them into a single visible
+      // point. Using {x, y} objects with a numeric/unique x avoids that.
+      const labels = machineRawLabels || overTime.map(d => formatLabel(d.day, groupBy));
+      const points = isPerSample
+        ? overTime.map((d, i) => ({ x: i, y: d.avg_score }))
+        : overTime.map(d => d.avg_score);
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: isPerSample ? undefined : labels,
+          datasets: [{
+            label: 'Average score',
+            data: points,
+            borderColor: '#185fa5',
+            backgroundColor: 'rgba(24,95,165,0.1)',
+            tension: isPerSample ? 0.15 : 0.25,
+            pointRadius: isPerSample ? 2 : 3,
+            fill: true,
+          }]
+        },
+        options: {
+          scales: {
+            y: { min: 0, max: 100 },
+            x: isPerSample
+              ? {
+                  type: 'linear',
+                  ticks: {
+                    maxRotation: 45,
+                    minRotation: 0,
+                    autoSkip: true,
+                    callback: (value) => {
+                      const i = Math.round(value);
+                      return (i === value && labels[i] !== undefined) ? labels[i] : '';
+                    }
+                  }
+                }
+              : { ticks: { maxRotation: 45, minRotation: 0, autoSkip: true } }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: isPerSample ? { callbacks: { title: (items) => labels[items[0].dataIndex] || '' } } : {}
+          }
+        }
+      });
+    }
+
+    async function loadBatchOptions() {
+      const res = await fetch('/api/batches');
+      const data = await res.json();
+      const batchSelect = document.getElementById('batchSelect');
+      data.batches.filter(b => b.sample_count > 0).forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = `${b.name} (${b.sample_count} sample${b.sample_count === 1 ? '' : 's'})`;
+        batchSelect.appendChild(opt);
+      });
+    }
+
+    async function loadMachineOptions() {
+      const machines = await fetchMachines();
+      const machineSelect = document.getElementById('machineSelect');
+      machines.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name;
+        machineSelect.appendChild(opt);
+      });
+    }
+
+    function currentSelection() {
+      const groupBy = document.getElementById('groupBySelect').value;
+      const batchId = document.getElementById('batchSelect').value;
+      const machineName = document.getElementById('machineSelect').value;
+      const machinePriority = document.getElementById('machinePrioritySelect').value;
+
+      if (groupBy === 'batch' && batchId) {
+        return { groupBy: 'batch_log', batchId, machineName, machinePriority };
+      }
+      if (groupBy === 'machine' && machineName) {
+        return { groupBy: 'machine_log', batchId: null, machineName, machinePriority };
+      }
+      if (groupBy === 'machine_raw') {
+        // All samples, labelled by machine, no averaging — machineName acts as filter
+        return { groupBy: 'machine_raw', batchId: null, machineName, machinePriority };
+      }
+      // For all other groupBy modes, machineName acts as a filter
+      return { groupBy, batchId: null, machineName, machinePriority };
+    }
+
+    function refreshChart() {
+      const { groupBy, batchId, machineName, machinePriority } = currentSelection();
+      loadChart(groupBy, batchId, machineName, machinePriority);
+    }
+
+    async function loadUserTable() {
+      const res = await fetch('/api/stats/summary');
+      const data = await res.json();
+      const userTable = document.getElementById('userTable');
+
+      if (!data.perUser.length) {
+        userTable.innerHTML = '<div class="empty-state">No data yet.</div>';
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.fontSize = '14px';
+      table.innerHTML = `
+        <thead>
+          <tr style="text-align:left; color:#6b6a64; font-size:12px;">
+            <th style="padding:6px 0;">Name</th>
+            <th style="padding:6px 0;">Samples</th>
+            <th style="padding:6px 0;">Avg score</th>
+            <th style="padding:6px 0;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.perUser.map(u => `
+            <tr style="border-top:1px solid #ece9e2;">
+              <td style="padding:8px 0;">${escapeHtml(u.user_name)}</td>
+              <td style="padding:8px 0;">${u.sample_count}</td>
+              <td style="padding:8px 0; font-weight:600;">${u.avg_score}</td>
+              <td style="padding:8px 0; text-align:right;">
+                <a href="/report?type=user&id=${u.user_id}" style="font-size:12px;">View report</a>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+      userTable.appendChild(table);
+    }
+
+    (async function init() {
+      const currentUser = await initTopbar('trends');
+      if (!currentUser) return;
+
+      const groupBySelect = document.getElementById('groupBySelect');
+      const batchSelect = document.getElementById('batchSelect');
+      const machineSelect = document.getElementById('machineSelect');
+      const machinePrioritySelect = document.getElementById('machinePrioritySelect');
+
+      await loadBatchOptions();
+      await loadMachineOptions();
+
+      function syncBatchVisibility() {
+        batchSelect.style.display = groupBySelect.value === 'batch' ? 'inline-block' : 'none';
+        machinePrioritySelect.style.opacity = (groupBySelect.value === 'machine' || groupBySelect.value === 'machine_raw') ? '1' : '0.55';
+      }
+
+      groupBySelect.addEventListener('change', () => {
+        syncBatchVisibility();
+        refreshChart();
+      });
+      batchSelect.addEventListener('change', refreshChart);
+      machineSelect.addEventListener('change', refreshChart);
+      machinePrioritySelect.addEventListener('change', refreshChart);
+
+      syncBatchVisibility();
+      refreshChart();
+      await loadUserTable();
+    })();
+  </script>
+    </div><!-- /tool-content -->
+  </div><!-- /tool-shell -->
+</body>
+</html>

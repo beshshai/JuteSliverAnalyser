@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jute sliver analyzer — sign in</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <h1>Jute sliver analyzer</h1>
+      <p>Enter your name to continue. No password needed.</p>
+      <form id="loginForm">
+        <input type="text" id="nameInput" placeholder="Your name" maxlength="50" autocomplete="off" required>
+        <div class="error-msg" id="errorMsg" style="display:none;"></div>
+        <button type="submit" style="width:100%; margin-top:12px;">Continue</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const errorMsg = document.getElementById('errorMsg');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.style.display = 'none';
+      const name = document.getElementById('nameInput').value.trim();
+      if (!name) return;
+
+      try {
+        const res = await fetch('/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errorMsg.textContent = data.error || 'Something went wrong';
+          errorMsg.style.display = 'block';
+          return;
+        }
+        window.location.href = '/dashboard';
+      } catch (err) {
+        errorMsg.textContent = 'Could not reach the server. Try again.';
+        errorMsg.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

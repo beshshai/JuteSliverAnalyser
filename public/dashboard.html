@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Jute sliver analyzer</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="topbar" id="topbar"></div>
+
+
+  <div class="tool-shell">
+    <nav class="tool-sidebar">
+      <div class="tool-sidebar-label">Tools</div>
+      <a href="/dashboard" id="sb_fo" class="active"><span class="tool-icon">🔬</span> Fiber Orientation</a>
+      <a href="/mass-variation" class=""><span class="tool-icon">📏</span> Mass Variation</a>
+      <a href="/sliver-width" class=""><span class="tool-icon">🧵</span> Sliver Width</a>
+      <div class="tool-sidebar-sub" id="sb_fo_sub">Fiber Orientation</div>
+      <a href="/dashboard" id="sb_dash" class="active"><span class="tool-icon">🖼</span> Upload &amp; Analyse</a>
+      <a href="/batches" id="sb_batches" class=""><span class="tool-icon">📦</span> Batches</a>
+      <a href="/trends" id="sb_trends" class=""><span class="tool-icon">📈</span> Trends</a>
+    </nav>
+    <div class="tool-content">
+    <h1 class="page-title">Upload samples</h1>
+    <p class="page-sub">Drop in photos of jute sliver from the spreader. Each image is analyzed for fiber parallelization automatically.</p>
+
+    <div class="card">
+      <div class="drop-zone" id="dropZone">
+        <div style="font-size:28px;">+</div>
+        <p>Drop images here or click to browse</p>
+        <span>JPG or PNG, up to 100 at a time</span>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
+      <div class="thumb-grid" id="thumbGrid"></div>
+      <div style="margin-top:1rem; display:flex; gap:10px; flex-wrap:wrap;">
+        <select id="batchInput" style="width:auto; min-width:220px;">
+          <option value="">Add to batch (optional)</option>
+        </select>
+        <select id="machineInput" style="width:auto; min-width:220px;">
+          <option value="">Machine type (optional)</option>
+        </select>
+        <input type="text" id="notesInput" placeholder="Optional note for this batch (e.g. date, settings)" style="flex:1; min-width:200px;">
+      </div>
+      <div style="display:flex; gap:10px; margin-top:1rem;">
+        <button id="analyzeBtn" style="display:none;">Analyze and upload</button>
+        <button id="clearBtn" class="secondary" style="display:none;">Clear</button>
+      </div>
+      <div class="error-msg" id="uploadError" style="display:none;"></div>
+    </div>
+
+    <h1 class="page-title" style="margin-top:2rem;">Recent samples</h1>
+    <p class="page-sub">All uploads from the team. Filter by person or date.</p>
+
+    <div class="filters">
+      <select id="userFilter"><option value="">All users</option></select>
+      <select id="machineFilter"><option value="">All machines</option></select>
+      <input type="text" id="fromFilter" placeholder="From (YYYY-MM-DD)">
+      <input type="text" id="toFilter" placeholder="To (YYYY-MM-DD)">
+      <button class="secondary" id="applyFilters" style="padding:9px 14px;">Apply</button>
+      <button class="secondary" id="resetFilters" style="padding:9px 14px;">Reset</button>
+      <a id="userReportLink" href="#" style="display:none; align-self:center; font-size:13px;">View report &rarr;</a>
+    </div>
+
+    <div class="card" id="feedCard">
+      <div id="feedList"></div>
+    </div>
+  </div>
+
+  <script src="/shared.js?v=6"></script>
+  <script>
+    let currentUser = null;
+    let fileMap = new Map();
+    let fileCounter = 0;
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const thumbGrid = document.getElementById('thumbGrid');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const uploadError = document.getElementById('uploadError');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      addFiles([...e.dataTransfer.files]);
+    });
+    fileInput.addEventListener('change', () => addFiles([...fileInput.files]));
+
+    function addFiles(newFiles) {
+      const remaining = 100 - fileMap.size;
+      newFiles.slice(0, remaining).forEach(f => {
+        if (!f.type.startsWith('image/')) return;
+        const idx = fileCounter++;
+        fileMap.set(idx, f);
+        const reader = new FileReader();
+        reader.onload = e => {
+          const wrap = document.createElement('div');
+          wrap.className = 'thumb-wrap';
+          wrap.id = 'thumb-' + idx;
+          wrap.innerHTML = `<img src="${e.target.result}" alt="sample ${idx+1}"><button class="thumb-remove" onclick="removeFile(${idx})">×</button>`;
+          thumbGrid.appendChild(wrap);
+        };
+        reader.readAsDataURL(f);
+      });
+      updateButtons();
+    }
+
+    function removeFile(idx) {
+      fileMap.delete(idx);
+      const el = document.getElementById('thumb-' + idx);
+      if (el) el.remove();
+      updateButtons();
+    }
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      fileMap.clear();
+      thumbGrid.innerHTML = '';
+      fileInput.value = '';
+      updateButtons();
+    });
+
+    function updateButtons() {
+      const hasFiles = fileMap.size > 0;
+      analyzeBtn.style.display = hasFiles ? 'inline-flex' : 'none';
+      clearBtn.style.display = hasFiles ? 'inline-flex' : 'none';
+    }
+
+    analyzeBtn.addEventListener('click', async () => {
+      uploadError.style.display = 'none';
+      const validFiles = [...fileMap.values()];
+      if (!validFiles.length) return;
+
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
+
+      const notes = document.getElementById('notesInput').value;
+      const machineType = document.getElementById('machineInput').value;
+      const batchId = document.getElementById('batchInput').value;
+
+      for (const f of validFiles) {
+        const formData = new FormData();
+        formData.append('image', f);
+        formData.append('notes', notes);
+        if (machineType) formData.append('machine_type', machineType);
+        if (batchId) formData.append('batch_id', batchId);
+        try {
+          const res = await fetch('/api/samples', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (!res.ok) {
+            uploadError.textContent = `${f.name}: ${data.error}`;
+            uploadError.style.display = 'block';
+            continue;
+          }
+        } catch (err) {
+          uploadError.textContent = `${f.name}: upload failed`;
+          uploadError.style.display = 'block';
+        }
+      }
+
+      fileMap.clear();
+      thumbGrid.innerHTML = '';
+      fileInput.value = '';
+      document.getElementById('notesInput').value = '';
+      document.getElementById('machineInput').value = '';
+      document.getElementById('batchInput').value = '';
+      updateButtons();
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = 'Analyze and upload';
+
+      loadFeed();
+    });
+
+    async function loadUsers() {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      const select = document.getElementById('userFilter');
+      data.users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = u.name;
+        select.appendChild(opt);
+      });
+    }
+
+    async function loadMachines() {
+      const machines = await fetchMachines();
+      populateMachineSelect(document.getElementById('machineInput'), machines, { blankLabel: 'Machine type (optional)' });
+      populateMachineSelect(document.getElementById('machineFilter'), machines, { blankLabel: 'All machines' });
+    }
+
+    async function loadOpenBatches() {
+      try {
+        const res = await fetch('/api/batches');
+        const data = await res.json();
+        const sel = document.getElementById('batchInput');
+        sel.innerHTML = '<option value="">Add to batch (optional)</option>';
+        (data.batches || []).filter(b => !b.closed).forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = b.name + (b.machine_type ? ' · ' + b.machine_type : '');
+          sel.appendChild(opt);
+        });
+        // Add quick-create option
+        const createOpt = document.createElement('option');
+        createOpt.value = '__new__';
+        createOpt.textContent = '＋ Create new batch…';
+        sel.appendChild(createOpt);
+      } catch (e) { /* non-critical */ }
+    }
+
+    // Persistent handler for "Create new batch" option in the upload form
+    document.getElementById('batchInput').addEventListener('change', async function() {
+      if (this.value !== '__new__') return;
+      const name = prompt('New batch name:');
+      if (!name) { this.value = ''; return; }
+      const r = await fetch('/api/batches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const d = await r.json();
+      if (!r.ok) { alert(d.error); this.value = ''; return; }
+      // Insert the new batch before the __new__ option
+      const createOpt = this.querySelector('option[value="__new__"]');
+      const opt = document.createElement('option');
+      opt.value = d.batch.id;
+      opt.textContent = d.batch.name;
+      this.insertBefore(opt, createOpt);
+      this.value = d.batch.id;
+    });
+
+
+    function buildQuery() {
+      const params = new URLSearchParams();
+      const userId = document.getElementById('userFilter').value;
+      const machineType = document.getElementById('machineFilter').value;
+      const from = document.getElementById('fromFilter').value.trim();
+      const to = document.getElementById('toFilter').value.trim();
+      if (userId) params.set('user_id', userId);
+      if (machineType) params.set('machine_type', machineType);
+      if (from) params.set('from', from);
+      if (to) params.set('to', to + ' 23:59:59');
+      return params.toString();
+    }
+
+    async function loadFeed() {
+      const feedList = document.getElementById('feedList');
+      feedList.innerHTML = '<div class="empty-state"><span class="spinner"></span>Loading...</div>';
+
+      const query = buildQuery();
+      const res = await fetch('/api/samples' + (query ? '?' + query : ''));
+      const data = await res.json();
+
+      if (!data.samples.length) {
+        feedList.innerHTML = '<div class="empty-state">No samples yet. Upload one above to get started.</div>';
+        return;
+      }
+
+      feedList.innerHTML = '';
+      data.samples.forEach(s => {
+        const badge = scoreBadgeClass(s.score);
+        const color = scoreColor(s.score);
+        const row = document.createElement('div');
+        row.className = 'result-row';
+        const canDelete = currentUser && currentUser.id === s.user_id;
+        row.innerHTML = `
+          <img class="thumb" src="${s.image_path}" alt="sample from ${escapeHtml(s.user_name)}">
+          <div class="result-meta">
+            <div class="result-meta-top">
+              <span class="uploader">${escapeHtml(s.user_name)}</span>
+              ${s.machine_type ? `<span class="badge" style="background:#eef2f7;color:#185fa5;">${escapeHtml(s.machine_type)}</span>` : ''}
+              <span class="badge ${badge.cls}">${badge.label} · ${s.score}/100</span>
+            </div>
+            <div class="score-bar-bg"><div class="score-bar-fill" style="width:${s.score}%; background:${color};"></div></div>
+            <div class="result-metrics">
+              Mean angle ${s.mean_angle_deg}° · std dev ${s.angular_stddev_deg}° · ${s.width}×${s.height}px
+              ${s.notes ? ' · ' + escapeHtml(s.notes) : ''}
+            </div>
+            <div class="result-meta-top" style="margin-top:4px;">
+              <span class="timestamp">${timeAgo(s.created_at)}</span>
+              ${canDelete ? `<button class="delete-btn" data-id="${s.id}">Delete</button>` : ''}
+            </div>
+          </div>
+        `;
+        feedList.appendChild(row);
+      });
+
+      feedList.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this sample?')) return;
+          await fetch('/api/samples/' + btn.dataset.id, { method: 'DELETE' });
+          loadFeed();
+        });
+      });
+    }
+
+    function syncUserReportLink() {
+      const userId = document.getElementById('userFilter').value;
+      const link = document.getElementById('userReportLink');
+      if (userId) {
+        link.href = '/report?type=user&id=' + encodeURIComponent(userId);
+        link.style.display = 'inline-block';
+      } else {
+        link.style.display = 'none';
+      }
+    }
+
+    document.getElementById('userFilter').addEventListener('change', syncUserReportLink);
+
+    document.getElementById('applyFilters').addEventListener('click', loadFeed);
+    document.getElementById('resetFilters').addEventListener('click', () => {
+      document.getElementById('userFilter').value = '';
+      document.getElementById('machineFilter').value = '';
+      document.getElementById('fromFilter').value = '';
+      document.getElementById('toFilter').value = '';
+      syncUserReportLink();
+      loadFeed();
+    });
+
+    (async function init() {
+      currentUser = await initTopbar('dashboard');
+      if (!currentUser) return;
+      await loadUsers();
+      await loadMachines();
+      await loadOpenBatches();
+      await loadFeed();
+    })();
+  </script>
+    </div><!-- /tool-content -->
+  </div><!-- /tool-shell -->
+</body>
+</html>

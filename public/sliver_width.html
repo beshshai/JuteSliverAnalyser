@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sliver Width Analyser — Jute sliver analyzer</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+#sliverToolRoot {
+    --bg: #f5f3ef; --panel: #fff; --accent: #7a5c2e; --accent-light: #c4a06a;
+    --text: #1a1612; --muted: #7a7068; --border: #d9d2c8;
+    --success: #3a7a4a; --error: #9b3a2a;
+  }#sliverToolRoot * { box-sizing: border-box; margin: 0; padding: 0; }#sliverToolRoot body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); min-height: 100vh; }#sliverToolRoot header { background: var(--accent); color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 14px; }#sliverToolRoot header .icon { width: 36px; height: 36px; background: rgba(255,255,255,0.2); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 20px; }#sliverToolRoot header h1 { font-size: 1.2rem; font-weight: normal; letter-spacing: 0.03em; }#sliverToolRoot header p { font-size: 0.75rem; opacity: 0.7; font-family: monospace; margin-top: 2px; }#sliverToolRoot .fiber-line { height: 4px; background: repeating-linear-gradient(90deg,#c4a06a 0,#7a5c2e 4px,#c4a06a 8px); opacity:.35; }#sliverToolRoot .main { max-width: 980px; margin: 0 auto; padding: 28px 20px; display: flex; flex-direction: column; gap: 22px; }#sliverToolRoot .card { background: var(--panel); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; }#sliverToolRoot .card-header { padding: 13px 20px; background: #faf8f5; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }#sliverToolRoot .step-badge { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .75rem; font-family: monospace; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }#sliverToolRoot .card-header h2 { font-size: .93rem; font-weight: normal; }#sliverToolRoot .card-header .hint { font-size: .76rem; color: var(--muted); margin-left: auto; font-family: monospace; }#sliverToolRoot .card-body { padding: 18px 20px; }#sliverToolRoot .field { display: flex; flex-direction: column; gap: 5px; }#sliverToolRoot .field label { font-size: .75rem; color: var(--muted); font-family: monospace; text-transform: uppercase; letter-spacing: .06em; }#sliverToolRoot .field input[type=number] { padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; font-size: .93rem; font-family: monospace; width: 110px; background: #faf8f5; color: var(--text); outline: none; }#sliverToolRoot .field input:focus { border-color: var(--accent-light); }#sliverToolRoot .field .unit { font-size: .7rem; color: var(--muted); font-family: monospace; }#sliverToolRoot .row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }#sliverToolRoot .calib-pill { padding: 9px 14px; background: #f0ece5; border-radius: 6px; font-family: monospace; font-size: .8rem; color: var(--accent); border: 1px solid var(--border); white-space: nowrap; }#sliverToolRoot /* Upload zone */
+  .upload-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 28px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; position: relative; }#sliverToolRoot .upload-zone:hover, #sliverToolRoot .upload-zone.drag { border-color: var(--accent-light); background: #faf7f2; }#sliverToolRoot .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }#sliverToolRoot .upload-zone .uz-icon { font-size: 1.8rem; margin-bottom: 6px; }#sliverToolRoot .upload-zone p { font-size: .83rem; color: var(--muted); }#sliverToolRoot .upload-zone strong { color: var(--accent); font-weight: normal; }#sliverToolRoot /* Image queue */
+  .img-queue { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }#sliverToolRoot .img-thumb { position: relative; border-radius: 6px; overflow: hidden; border: 2px solid var(--border); cursor: grab; user-select: none; transition: border-color .2s, box-shadow .2s; }#sliverToolRoot .img-thumb:hover { border-color: var(--accent-light); }#sliverToolRoot .img-thumb.dragging { opacity: .5; border-color: var(--accent); }#sliverToolRoot .img-thumb.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }#sliverToolRoot .img-thumb img { display: block; height: 72px; width: auto; max-width: 140px; object-fit: cover; pointer-events: none; }#sliverToolRoot .thumb-label { position: absolute; top: 3px; left: 5px; background: rgba(0,0,0,.55); color: #fff; font-family: monospace; font-size: .65rem; padding: 1px 5px; border-radius: 3px; }#sliverToolRoot .thumb-del { position: absolute; top: 3px; right: 3px; background: rgba(155,58,42,.85); color: #fff; border: none; border-radius: 3px; font-size: .65rem; padding: 2px 5px; cursor: pointer; line-height: 1; }#sliverToolRoot .thumb-del:hover { background: var(--error); }#sliverToolRoot .queue-hint { font-size: .72rem; color: var(--muted); font-family: monospace; margin-top: 6px; }#sliverToolRoot /* Stitched preview */
+  .stitch-wrap { position: relative; width: 100%; overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); background: #f0ece5; }#sliverToolRoot .stitch-wrap canvas { display: block; max-width: none; }#sliverToolRoot .stitch-wrap .overlay-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }#sliverToolRoot /* Controls */
+  .ctrl-row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }#sliverToolRoot .thresh-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }#sliverToolRoot .thresh-row label { font-size: .76rem; font-family: monospace; color: var(--muted); white-space: nowrap; }#sliverToolRoot .thresh-row input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }#sliverToolRoot .thresh-val { font-family: monospace; font-size: .83rem; color: var(--accent); width: 34px; text-align: right; }#sliverToolRoot .btn { padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: .86rem; font-family: 'Georgia',serif; transition: opacity .15s; }#sliverToolRoot .btn:disabled { opacity: .4; cursor: not-allowed; }#sliverToolRoot .btn-primary { background: var(--accent); color: #fff; }#sliverToolRoot .btn-primary:hover:not(:disabled) { opacity: .85; }#sliverToolRoot .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }#sliverToolRoot .btn-ghost:hover:not(:disabled) { border-color: var(--accent-light); color: var(--accent); }#sliverToolRoot .btn-sm { padding: 5px 12px; font-size: .78rem; }#sliverToolRoot /* Metrics */
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin-top: 14px; }#sliverToolRoot .metric { background: #faf8f5; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }#sliverToolRoot .metric .mlabel { font-size: .7rem; font-family: monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }#sliverToolRoot .metric .mval { font-size: 1.45rem; font-family: 'Courier New',monospace; color: var(--accent); margin-top: 3px; }#sliverToolRoot .metric .mval span { font-size: .8rem; color: var(--muted); }#sliverToolRoot .metric.hl { background: var(--accent); border-color: var(--accent); }#sliverToolRoot .metric.hl .mlabel { color: rgba(255,255,255,.7); }#sliverToolRoot .metric.hl .mval { color: #fff; }#sliverToolRoot .metric.hl .mval span { color: rgba(255,255,255,.65); }#sliverToolRoot /* Charts */
+  .chart-label { font-size: .7rem; font-family: monospace; color: var(--muted); margin-bottom: 5px; }#sliverToolRoot canvas.profile-c { width: 100%; height: 90px; display: block; border-radius: 6px; background: #faf8f5; border: 1px solid var(--border); }#sliverToolRoot canvas.var-c { width: 100%; height: 130px; display: block; border-radius: 6px; background: #faf8f5; border: 1px solid var(--border); }#sliverToolRoot /* Cut section */
+  .cut-box { margin-top: 18px; background: #f7f4ef; border: 1px solid var(--border); border-radius: 8px; padding: 16px; }#sliverToolRoot .cut-box h3 { font-size: .86rem; font-weight: normal; color: var(--accent); margin-bottom: 11px; display: flex; align-items: center; gap: 8px; }#sliverToolRoot .cut-box h3 .badge { font-size: .65rem; background: var(--accent); color: #fff; padding: 2px 7px; border-radius: 10px; font-family: monospace; }#sliverToolRoot /* Segment table */
+  .seg-wrap { overflow-x: auto; margin-top: 12px; border-radius: 6px; border: 1px solid var(--border); }#sliverToolRoot table.segtab { width: 100%; border-collapse: collapse; font-family: monospace; font-size: .8rem; }#sliverToolRoot table.segtab th { background: #f0ece5; color: var(--muted); padding: 7px 11px; text-align: left; font-weight: normal; text-transform: uppercase; letter-spacing: .05em; font-size: .68rem; border-bottom: 1px solid var(--border); }#sliverToolRoot table.segtab td { padding: 7px 11px; border-bottom: 1px solid #ede9e2; }#sliverToolRoot table.segtab tr:last-child td { border-bottom: none; }#sliverToolRoot table.segtab tr:hover td { background: #faf8f5; }#sliverToolRoot td.avgv { color: var(--accent); font-weight: bold; }#sliverToolRoot .bar-bg { background: #e8e2d8; border-radius: 3px; height: 9px; overflow: hidden; width: 90px; }#sliverToolRoot .bar-fill { height: 100%; border-radius: 3px; background: var(--accent-light); }#sliverToolRoot .status-msg { font-size: .8rem; font-family: monospace; padding: 7px 13px; border-radius: 6px; margin-top: 10px; }#sliverToolRoot .status-msg.ok { background: #eaf2ec; color: var(--success); border: 1px solid #b8dfc0; }#sliverToolRoot .status-msg.err { background: #f5ecea; color: var(--error);   border: 1px solid #e8c0bb; }#sliverToolRoot .status-msg.info { background: #eeeae3; color: var(--accent);  border: 1px solid var(--border); }#sliverToolRoot .hidden { display: none !important; }#sliverToolRoot .divider { height: 1px; background: var(--border); margin: 14px 0; }#sliverToolRoot .export-row { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }#sliverToolRoot .img-source-chip { display: inline-block; font-family: monospace; font-size: .65rem; background: #e8e2d8; color: var(--muted); padding: 1px 6px; border-radius: 8px; margin-left: 4px; }#sliverToolRoot /* Preview modal */
+  .thumb-preview { position: absolute; bottom: 3px; right: 3px; background: rgba(122,92,46,.85); color: #fff; border: none; border-radius: 3px; font-size: .7rem; padding: 2px 6px; cursor: pointer; line-height: 1; }#sliverToolRoot .thumb-preview:hover { background: var(--accent); }#sliverToolRoot .preview-modal { position: fixed; inset: 0; background: rgba(20,16,10,0.72); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }#sliverToolRoot .preview-modal-inner { background: var(--panel); border-radius: 10px; max-width: min(1400px,96vw); max-height: 92vh; width: 100%; display: flex; flex-direction: column; overflow: hidden; }#sliverToolRoot .preview-modal-header { display: flex; align-items: center; gap: 16px; padding: 12px 18px; background: #faf8f5; border-bottom: 1px solid var(--border); font-family: monospace; font-size: .85rem; color: var(--accent); }#sliverToolRoot .preview-overlay-toggle { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--muted); cursor: pointer; margin-left: auto; }#sliverToolRoot .preview-modal-body { flex: 1; overflow: auto; padding: 14px; background: #f0ece5; display: flex; align-items: center; justify-content: center; }#sliverToolRoot .preview-canvas-wrap { position: relative; line-height: 0; }#sliverToolRoot .preview-canvas-wrap canvas { display: block; max-width: 100%; height: auto; }#sliverToolRoot .preview-canvas-wrap .overlay-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }#sliverToolRoot .preview-modal-hint { font-size: .72rem; color: var(--muted); font-family: monospace; padding: 8px 18px 14px; }
+
+</style>
+</head>
+<body>
+  <div class="topbar" id="topbar"></div>
+
+  <div class="tool-shell">
+    <nav class="tool-sidebar">
+      <div class="tool-sidebar-label">Tools</div>
+      <a href="/dashboard"><span class="tool-icon">🔬</span> Fiber Orientation</a>
+      <a href="/mass-variation"><span class="tool-icon">📏</span> Mass Variation</a>
+      <a href="/sliver-width" class="active"><span class="tool-icon">🧵</span> Sliver Width</a>
+      <div class="tool-sidebar-sub">Sliver Width</div>
+      <a href="/sliver-width" class="active"><span class="tool-icon">📷</span> Photo Analysis</a>
+    </nav>
+
+    <div class="tool-content">
+      <h1 class="page-title">Sliver Width Analyser</h1>
+      <p class="page-sub">Multi-image stitching, pixel-calibrated width measurement, and cut-length variation analysis from photos. Results can be sent straight into Mass Variation for full CV%/control-limit statistics.</p>
+
+      <div id="sliverToolRoot">
+        <div class="main">
+
+<!-- ─── STEP 1: Calibration ─── -->
+<div class="card">
+  <div class="card-header">
+    <div class="step-badge">1</div>
+    <h2>Calibration — reference surface size</h2>
+    <span class="hint">physical size of blank reference image</span>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="field"><label>Width</label><input type="number" id="refW" value="20" min="1" step="0.1"><span class="unit">cm</span></div>
+      <div class="field"><label>Height</label><input type="number" id="refH" value="7" min="1" step="0.1"><span class="unit">cm</span></div>
+      <div class="calib-pill" id="calibDisplay">— px/cm</div>
+    </div>
+    <p style="font-size:.75rem;color:var(--muted);margin-top:10px;font-family:monospace;">ℹ Height axis → px/mm scale. Every image (reference + samples) must frame the same physical surface height — but each is scaled to that height using its OWN pixel dimensions, so it's fine if hand-shot photos differ in resolution or get cropped differently.</p>
+  </div>
+</div>
+
+<!-- ─── STEP 2: Reference ─── -->
+<div class="card">
+  <div class="card-header">
+    <div class="step-badge">2</div>
+    <h2>Reference image — blank surface</h2>
+    <span class="hint">no sliver · calibration only</span>
+  </div>
+  <div class="card-body">
+    <div class="upload-zone" id="refZone">
+      <input type="file" id="refFile" accept="image/*">
+      <div class="uz-icon">🖼️</div>
+      <p>Drop or click — <strong>blank surface reference</strong></p>
+      <p style="font-size:.7rem;margin-top:4px;">White/grey surface, 20 cm × 7 cm</p>
+    </div>
+    <div id="refInfo" class="status-msg info hidden"></div>
+    <div id="refPreviewWrap" class="hidden" style="margin-top:12px;">
+      <img id="refPreviewImg" style="max-width:100%;max-height:220px;display:block;border-radius:8px;border:1px solid var(--border);">
+    </div>
+  </div>
+</div>
+
+<!-- ─── STEP 3: Sample images ─── -->
+<div class="card">
+  <div class="card-header">
+    <div class="step-badge">3</div>
+    <h2>Sample images — jute sliver</h2>
+    <span class="hint">add multiple images · drag to reorder · stitched left→right</span>
+  </div>
+  <div class="card-body">
+
+    <div class="upload-zone" id="sampleZone">
+      <input type="file" id="sampleFile" accept="image/*" multiple>
+      <div class="uz-icon">📷</div>
+      <p>Drop or click to add <strong>one or more sample images</strong></p>
+      <p style="font-size:.7rem;margin-top:4px;">They will be stitched in order (left → right). Drag thumbnails to reorder.</p>
+    </div>
+
+    <div id="imgQueue" class="img-queue"></div>
+    <p class="queue-hint hidden" id="queueHint">Drag thumbnails to reorder. Click × to remove.</p>
+
+    <div class="ctrl-row" style="margin-top:14px;">
+      <button class="btn btn-primary" id="stitchBtn" disabled>▶ Stitch &amp; Measure</button>
+      <button class="btn btn-ghost btn-sm" id="clearAllBtn">Clear all</button>
+      <span id="queueInfo" style="font-size:.76rem;font-family:monospace;color:var(--muted);"></span>
+    </div>
+
+    <!-- stitched preview -->
+    <div id="stitchSection" class="hidden" style="margin-top:18px;">
+      <div class="chart-label" id="stitchLabel"></div>
+      <div class="stitch-wrap" id="stitchWrap">
+        <canvas id="stitchCanvas"></canvas>
+        <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
+      </div>
+
+      <div class="ctrl-row" style="margin-top:0;flex-wrap:wrap;gap:16px 22px;">
+        <label style="font-size:.76rem;font-family:monospace;color:var(--muted);white-space:nowrap;">Detection method:</label>
+        <label style="font-size:.8rem;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="detMethod" value="brightness" id="m_brightness"> Brightness</label>
+        <label style="font-size:.8rem;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="detMethod" value="adaptive" id="m_adaptive"> Adaptive</label>
+        <label style="font-size:.8rem;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="detMethod" value="edge" id="m_edge"> Edge</label>
+        <label style="font-size:.8rem;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="detMethod" value="hsv" id="m_hsv" checked> HSV colour</label>
+        <label style="font-size:.8rem;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="detMethod" value="ensemble" id="m_ensemble"> Ensemble (vote)</label>
+      </div>
+      <p id="methodHint" style="font-size:.7rem;color:var(--muted);font-family:monospace;margin-top:6px;"></p>
+
+      <!-- Brightness params -->
+      <div class="thresh-row method-params" data-method="brightness" style="display:none;">
+        <label>Brightness threshold</label>
+        <input type="range" id="threshSlider" min="100" max="240" value="175">
+        <span class="thresh-val" id="threshVal">175</span>
+        <button class="btn btn-primary btn-sm redetect-btn">Re-detect</button>
+      </div>
+
+      <!-- Adaptive params -->
+      <div class="thresh-row method-params" data-method="adaptive" style="display:none;">
+        <label>Local contrast offset</label>
+        <input type="range" id="adaptOffsetSlider" min="2" max="60" value="18">
+        <span class="thresh-val" id="adaptOffsetVal">18</span>
+        <label style="margin-left:8px;">Window (px)</label>
+        <input type="range" id="adaptWinSlider" min="9" max="151" step="2" value="51">
+        <span class="thresh-val" id="adaptWinVal">51</span>
+        <button class="btn btn-primary btn-sm redetect-btn">Re-detect</button>
+      </div>
+
+      <!-- Edge params -->
+      <div class="thresh-row method-params" data-method="edge" style="display:none;">
+        <label>Edge sensitivity</label>
+        <input type="range" id="edgeSlider" min="5" max="120" value="35">
+        <span class="thresh-val" id="edgeVal">35</span>
+        <button class="btn btn-primary btn-sm redetect-btn">Re-detect</button>
+      </div>
+
+      <!-- HSV params -->
+      <div class="thresh-row method-params" data-method="hsv" style="display:flex;">
+        <label>Hue tolerance</label>
+        <input type="range" id="threshSliderHsv" min="5" max="90" value="40">
+        <span class="thresh-val" id="threshValHsv">40</span>
+        <button class="btn btn-primary btn-sm redetect-btn">Re-detect</button>
+      </div>
+      <div class="ctrl-row method-params" data-method="hsv" style="margin-top:0;display:flex;">
+        <label style="font-size:.76rem;font-family:monospace;color:var(--muted);">Sample sliver colour(s):</label>
+        <button class="btn btn-ghost btn-sm" id="pickColorBtn">🎯 Click sliver in image</button>
+        <button class="btn btn-ghost btn-sm" id="clearColorsBtn">Clear samples</button>
+        <span id="hueInfo" style="font-size:.74rem;font-family:monospace;color:var(--accent);"></span>
+      </div>
+      <p class="method-params" data-method="hsv" style="font-size:.68rem;color:var(--muted);font-family:monospace;margin-top:2px;display:block;">Click multiple times across light/dark patches of the sliver — each sampled colour is matched independently (covers golden-to-pale-brown range in one go).</p>
+
+      <!-- Ensemble params -->
+      <div class="thresh-row method-params" data-method="ensemble" style="display:none;">
+        <label>Votes required</label>
+        <input type="range" id="voteSlider" min="2" max="3" value="2">
+        <span class="thresh-val" id="voteVal">2</span>
+        <span style="font-size:.7rem;color:var(--muted);">of 3 (brightness · adaptive · HSV)</span>
+        <button class="btn btn-primary btn-sm redetect-btn">Re-detect</button>
+      </div>
+
+      <div class="thresh-row" style="border-top:1px dashed var(--border);padding-top:12px;margin-top:14px;">
+        <label>Hairyness filter (min. mass density)</label>
+        <input type="range" id="densitySlider" min="10" max="70" value="35">
+        <span class="thresh-val" id="densityVal">35</span>
+        <button class="btn btn-primary btn-sm redetect-btn">Re-detect</button>
+      </div>
+      <p style="font-size:.68rem;color:var(--muted);font-family:monospace;margin-top:2px;">Applies to every method. Raise this if stray hairs/wisps still get picked up as the boundary instead of the solid fiber mass; lower it if the dense mass itself gets rejected.</p>
+
+      <div class="thresh-row">
+        <label>Smooth boundary (px)</label>
+        <input type="range" id="smoothSlider" min="0" max="40" value="12">
+        <span class="thresh-val" id="smoothVal">12</span>
+        <button class="btn btn-primary btn-sm redetect-btn">Re-detect</button>
+      </div>
+      <p style="font-size:.68rem;color:var(--muted);font-family:monospace;margin-top:2px;">Smooths the jagged column-to-column edge trace (median filter + moving average) after detection — doesn't change which pixels are detected, just softens peaks/valleys in the drawn boundary and width values. Set to 0 to disable.</p>
+
+      <div class="thresh-row">
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;">
+          <input type="checkbox" id="frayToggle">
+          Detect fraying (split sliver into 2 strands)
+        </label>
+        <button class="btn btn-primary btn-sm redetect-btn">Re-detect</button>
+      </div>
+      <p style="font-size:.68rem;color:var(--error);font-family:monospace;margin-top:2px;">⚠ Experimental — currently buggy, off by default. When OFF: behaves like before (single longest dense run per column, old behaviour). When ON: tries to sum multiple frayed strands per column excluding the gap between them — known issues, use with caution.</p>
+
+      <div id="resultSection" class="hidden">
+        <div class="divider"></div>
+        <div class="chart-label">Width profile — full stitched length</div>
+        <canvas class="profile-c" id="profileCanvas"></canvas>
+        <div class="metrics-grid" id="metricsGrid"></div>
+        <div id="statusMsg" class="status-msg ok" style="margin-top:10px;"></div>
+
+        <!-- cut-length -->
+        <div class="cut-box">
+          <h3>✂️ Cut-Length Variation Analysis <span class="badge">SEGMENT</span></h3>
+          <div class="row">
+            <div class="field">
+              <label>Cut length</label>
+              <input type="number" id="cutLen" value="5" min="0.1" step="0.1">
+              <span class="unit">cm per segment</span>
+            </div>
+            <button class="btn btn-primary btn-sm" id="cutBtn">Analyse Segments</button>
+          </div>
+          <p style="font-size:.7rem;color:var(--muted);font-family:monospace;margin-top:7px;">
+            Full stitched length is divided into segments of this size. Each segment averages all columns inside it.
+          </p>
+
+          <div id="cutResults" class="hidden" style="margin-top:14px;">
+            <div class="chart-label" style="margin-bottom:5px;">Segment avg width — variation chart</div>
+            <canvas class="var-c" id="varCanvas"></canvas>
+            <div class="seg-wrap">
+              <table class="segtab">
+                <thead><tr>
+                  <th>#</th><th>Start</th><th>End</th><th>Avg (mm)</th>
+                  <th>Min (mm)</th><th>Max (mm)</th><th>Source images</th><th>vs Overall</th><th>Bar</th>
+                </tr></thead>
+                <tbody id="segBody"></tbody>
+              </table>
+            </div>
+            <div class="export-row">
+              <button class="btn btn-ghost btn-sm" id="exportBtn">⬇ Export CSV</button>
+              <button class="btn btn-primary btn-sm" id="sendToMVBtn" disabled>📤 Send to Mass Variation</button>
+            </div>
+            <div id="segSummary" class="status-msg info" style="margin-top:8px;"></div>
+            <div id="sendToMVStatus" class="status-msg ok hidden" style="margin-top:8px;"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+        </div><!-- /main -->
+
+
+<!-- ─── Single-image big preview modal ─── -->
+<div id="previewModal" class="preview-modal hidden">
+  <div class="preview-modal-inner">
+    <div class="preview-modal-header">
+      <span id="previewModalTitle">Image preview</span>
+      <label class="preview-overlay-toggle">
+        <input type="checkbox" id="previewOverlayToggle" checked> show detection mask
+      </label>
+      <button id="previewModalClose" class="btn btn-ghost btn-sm">✕ Close</button>
+    </div>
+    <div class="preview-modal-body">
+      <div class="preview-canvas-wrap">
+        <canvas id="previewBaseCanvas"></canvas>
+        <canvas id="previewMaskCanvas" class="overlay-canvas"></canvas>
+      </div>
+    </div>
+    <p class="preview-modal-hint">Shows the <strong>raw per-pixel mask</strong> for the current method &amp; sliders — updates live as you drag them. This is before the density filter and boundary smoothing the main detection also applies, so the final measured edge will look slightly cleaner than this.</p>
+  </div>
+</div>
+
+
+      </div><!-- /sliverToolRoot -->
+    </div><!-- /tool-content -->
+  </div><!-- /tool-shell -->
+
+  <script src="/shared.js?v=6"></script>
+  <script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let refPxH = null;
+let imageQueue = [];      // [{file, img, id}]  ordered list
+let stitchedCanvas = null; // offscreen canvas of stitched image
+let lastWidthsPx = null;
+let lastPxPerMm = null;
+let lastPxPerCm = null;
+let lastTopEdge = null;
+let lastBotEdge = null;
+let lastColRuns = null;
+let lastSegments = null;
+let imgBoundaries = [];   // [{imgIdx, colStart, colEnd}] for each source image column
+let lastNativeSampleH = null; // native (pre-downscale) height of imageQueue[0] — informational only
+
+let dragSrcIdx = null;
+
+// ═══════════════════════════════════════════════════════════
+// APP INTEGRATION — topbar/session + navigation
+// ═══════════════════════════════════════════════════════════
+(async () => { await initTopbar('sliver-width'); })();
+
+// ═══════════════════════════════════════════════════════════
+// CALIBRATION
+// ═══════════════════════════════════════════════════════════
+function updateCalib() {
+  const pH = parseFloat(document.getElementById('refH').value) || 7;
+  document.getElementById('calibDisplay').textContent =
+    refPxH ? `${(refPxH/pH).toFixed(1)} px/cm (H)` : '— px/cm (load ref)';
+}
+document.getElementById('refW').addEventListener('input', updateCalib);
+document.getElementById('refH').addEventListener('input', updateCalib);
+
+document.getElementById('refFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    refPxH = img.height;
+    const el = document.getElementById('refInfo');
+    el.textContent = `✓ Reference — ${img.width}×${img.height} px`;
+    el.className = 'status-msg ok'; el.classList.remove('hidden');
+    // show the actual reference photo, not just its dimensions — useful to
+    // eyeball that it's really a blank/even surface and matches the framing
+    // of your sample shots.
+    document.getElementById('refPreviewImg').src = img.src;
+    document.getElementById('refPreviewWrap').classList.remove('hidden');
+    updateCalib();
+  };
+  img.src = URL.createObjectURL(f);
+});
+
+setupDrop('refZone', 'refFile');
+
+// ═══════════════════════════════════════════════════════════
+// IMAGE QUEUE
+// ═══════════════════════════════════════════════════════════
+document.getElementById('sampleFile').addEventListener('change', e => {
+  addFiles(Array.from(e.target.files));
+  e.target.value = '';
+});
+setupDrop('sampleZone', 'sampleFile', true);
+
+function addFiles(files) {
+  // Reserve queue slots up front, in selection order, then fill each slot
+  // when its image finishes loading. Previously each image pushed itself
+  // into imageQueue inside its own onload callback, so with enough files
+  // in flight at once, slower-loading images could land out of order —
+  // easy to miss with 2-3 files, much more likely once batches are bigger
+  // (which they now can be). Reserving order up front fixes that for any
+  // batch size.
+  const slots = files.map(file => {
+    const id = Date.now() + Math.random();
+    const slot = { file, img: null, id, loaded: false };
+    imageQueue.push(slot);
+    return slot;
+  });
+  slots.forEach(slot => {
+    const img = new Image();
+    img.onload = () => {
+      slot.img = img;
+      slot.loaded = true;
+      renderQueue();
+    };
+    img.onerror = () => {
+      // drop the slot if the file wasn't a valid/loadable image
+      const i = imageQueue.indexOf(slot);
+      if (i !== -1) imageQueue.splice(i, 1);
+      renderQueue();
+    };
+    img.src = URL.createObjectURL(slot.file);
+  });
+  renderQueue();
+}
+
+function renderQueue() {
+  const queue = document.getElementById('imgQueue');
+  const hint  = document.getElementById('queueHint');
+  const info  = document.getElementById('queueInfo');
+  const btn   = document.getElementById('stitchBtn');
+
+  queue.innerHTML = '';
+  if (imageQueue.length === 0) {
+    hint.classList.add('hidden');
+    info.textContent = '';
+    btn.disabled = true;
+    return;
+  }
+  hint.classList.remove('hidden');
+
+  let loadedCount = 0;
+  imageQueue.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'img-thumb';
+    div.dataset.idx = idx;
+
+    if (!item.loaded) {
+      div.classList.add('loading');
+      div.style.width = '100px'; div.style.height = '72px';
+      div.style.display = 'flex'; div.style.alignItems = 'center'; div.style.justifyContent = 'center';
+      div.style.fontFamily = 'monospace'; div.style.fontSize = '.7rem'; div.style.color = 'var(--muted)';
+      div.textContent = '⏳ loading…';
+      queue.appendChild(div);
+      return;
+    }
+    loadedCount++;
+    div.draggable = true;
+
+    const im = document.createElement('img');
+    im.src = item.img.src;
+    div.appendChild(im);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'thumb-label';
+    lbl.textContent = `#${idx+1}`;
+    div.appendChild(lbl);
+
+    const del = document.createElement('button');
+    del.className = 'thumb-del';
+    del.textContent = '×';
+    del.onclick = (e) => { e.stopPropagation(); imageQueue.splice(idx,1); renderQueue(); };
+    div.appendChild(del);
+
+    const prev = document.createElement('button');
+    prev.className = 'thumb-preview';
+    prev.textContent = '🔍';
+    prev.title = 'View this image large, with live detection mask';
+    prev.onclick = (e) => { e.stopPropagation(); openImagePreview(idx); };
+    div.appendChild(prev);
+
+    // drag-to-reorder
+    div.addEventListener('dragstart', e => { dragSrcIdx = idx; div.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    div.addEventListener('dragend', () => { div.classList.remove('dragging'); document.querySelectorAll('.img-thumb').forEach(d=>d.classList.remove('drag-over')); });
+    div.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect='move'; div.classList.add('drag-over'); });
+    div.addEventListener('dragleave', () => div.classList.remove('drag-over'));
+    div.addEventListener('drop', e => {
+      e.preventDefault(); div.classList.remove('drag-over');
+      if (dragSrcIdx === null || dragSrcIdx === idx) return;
+      const moved = imageQueue.splice(dragSrcIdx,1)[0];
+      imageQueue.splice(idx,0,moved);
+      renderQueue();
+    });
+
+    queue.appendChild(div);
+  });
+
+  const pending = imageQueue.length - loadedCount;
+  info.textContent = `${imageQueue.length} image${imageQueue.length>1?'s':''} queued` + (pending ? ` (${pending} loading…)` : '');
+  btn.disabled = pending > 0; // wait until every image has actually loaded before allowing stitch
+}
+
+document.getElementById('clearAllBtn').addEventListener('click', () => {
+  imageQueue = [];
+  renderQueue();
+  document.getElementById('stitchSection').classList.add('hidden');
+  document.getElementById('resultSection').classList.add('hidden');
+  document.getElementById('cutResults').classList.add('hidden');
+  lastWidthsPx = null;
+});
+
+// ═══════════════════════════════════════════════════════════
+// STITCH + MEASURE
+// ═══════════════════════════════════════════════════════════
+document.getElementById('stitchBtn').addEventListener('click', stitchAndMeasure);
+document.querySelectorAll('.redetect-btn').forEach(b => b.addEventListener('click', runDetection));
+
+// ═══════════════════════════════════════════════════════════
+// METHOD SWITCHER — show/hide the right parameter controls + hint text
+// ═══════════════════════════════════════════════════════════
+const METHOD_HINTS = {
+  brightness: 'Simple global brightness cutoff. Fast, but struggles if lighting or sliver shade varies across the frame.',
+  adaptive:   'Each column compared against its local neighbourhood brightness instead of one fixed cutoff. Handles uneven lighting across the stitched length.',
+  edge:       'Sobel gradient finds the sharp transition between background and sliver edge directly — robust to colour/brightness, finds the true boundary rather than guessing from darkness.',
+  hsv:        'Matches the tan/brown colour of jute, ignoring brightness. Click the sliver in 2–3 different light/dark patches to cover a golden-to-pale-brown range in one pass.',
+  ensemble:   'Votes across brightness, adaptive, and HSV — a pixel only counts as sliver if enough methods agree. Most robust against shadows/noise, slower to compute.'
+};
+
+function updateMethodUI() {
+  const method = getSelectedMethod();
+  document.querySelectorAll('.method-params').forEach(el => {
+    el.style.display = (el.dataset.method === method) ? '' : 'none';
+  });
+  document.getElementById('methodHint').textContent = METHOD_HINTS[method] || '';
+}
+document.querySelectorAll('input[name="detMethod"]').forEach(r => {
+  r.addEventListener('change', () => { updateMethodUI(); if (stitchedCanvas) runDetection(); });
+});
+updateMethodUI();
+
+// ═══════════════════════════════════════════════════════════
+// COLOUR PICKER — sample sliver colour(s) directly from the image (HSV method)
+// Multiple samples accumulate so a golden-to-pale-brown sliver can be
+// covered by clicking a few representative patches instead of one hue.
+// ═══════════════════════════════════════════════════════════
+let pickingColor = false;
+document.getElementById('pickColorBtn').addEventListener('click', () => {
+  if (!stitchedCanvas) { alert('Stitch & Measure first.'); return; }
+  pickingColor = true;
+  const dispC = document.getElementById('stitchCanvas');
+  dispC.style.cursor = 'crosshair';
+  document.getElementById('hueInfo').textContent = '→ click anywhere on the sliver… (click again to add another sample)';
+});
+
+document.getElementById('clearColorsBtn').addEventListener('click', () => {
+  juteSamples = [];
+  document.getElementById('hueInfo').textContent = 'samples cleared — using default golden→pale-brown range';
+  if (stitchedCanvas && getSelectedMethod()==='hsv') runDetection();
+});
+
+document.getElementById('stitchCanvas').addEventListener('click', e => {
+  if (!pickingColor || !stitchedCanvas) return;
+  const dispC = e.target;
+  const rect = dispC.getBoundingClientRect();
+  // map click position (display canvas coords) -> full-res stitched canvas coords
+  const xFrac = (e.clientX-rect.left)/rect.width;
+  const yFrac = (e.clientY-rect.top)/rect.height;
+  const fx = Math.min(stitchedCanvas.width-1, Math.max(0, Math.round(xFrac*stitchedCanvas.width)));
+  const fy = Math.min(stitchedCanvas.height-1, Math.max(0, Math.round(yFrac*stitchedCanvas.height)));
+
+  const px = stitchedCanvas.getContext('2d').getImageData(fx,fy,1,1).data;
+  const [h,s,v] = rgbToHsv(px[0],px[1],px[2]);
+  juteSamples.push({h,s,v});
+
+  document.getElementById('hueInfo').textContent =
+    `✓ ${juteSamples.length} sample${juteSamples.length>1?'s':''} — last: hue ${h.toFixed(0)}° sat ${(s*100).toFixed(0)}% val ${(v*100).toFixed(0)}% (rgb ${px[0]},${px[1]},${px[2]}). Click "Re-detect" when done, or keep clicking to add more.`;
+
+  if (getSelectedMethod()==='hsv') runDetection();
+});
+
+// Working-resolution caps. The old version stitched images at their full
+// native camera resolution — fine for 2-3 photos, but a 10+ image batch at
+// e.g. 3000×4000px each builds a stitched canvas tens of thousands of pixels
+// wide. That blows past browser canvas-size ceilings (Chrome/Safari cap a
+// single canvas dimension around 16384px, and getImageData on a canvas that
+// size needs hundreds of MB) and is why the tool silently failed, froze the
+// tab, or threw "Maximum canvas size exceeded" past roughly 10 images. Width
+// measurement doesn't need full photo resolution — it only needs enough
+// columns to resolve how width changes along the sliver's length, and the
+// calibration (px/mm) only depends on height. So we downscale every image
+// to a bounded working height before stitching, which bounds total width
+// too and removes the practical image-count ceiling entirely.
+const WORK_HEIGHT_PX = 900;      // working height per stitched image (plenty for sub-pixel width measurement)
+const MAX_STITCH_WIDTH_PX = 12000; // hard ceiling on total stitched canvas width, regardless of image count
+
+function stitchAndMeasure() {
+  if (imageQueue.length === 0) return;
+
+  const stitchBtn = document.getElementById('stitchBtn');
+  stitchBtn.disabled = true;
+  const prevLabel = stitchBtn.textContent;
+  stitchBtn.textContent = '⏳ Stitching…';
+
+  // Defer to next frame so the disabled/label state actually paints before
+  // the (potentially heavy, for large batches) synchronous work below runs.
+  requestAnimationFrame(() => {
+    try {
+      // Normalise heights — scale every image to a bounded working height,
+      // not to the first image's native height. This keeps the stitched
+      // canvas's per-image height constant and small no matter how high-res
+      // the source photos are.
+      const targetH = Math.min(WORK_HEIGHT_PX, imageQueue[0].img.height);
+      lastNativeSampleH = imageQueue[0].img.height;
+
+      const physH = parseFloat(document.getElementById('refH').value) || 7;
+      const physWCm = parseFloat(document.getElementById('refW').value) || 20;
+
+      // Every sample image is assumed to frame the SAME physical board size
+      // (physWCm × physH cm) that the reference does — that's the whole
+      // point of calibrating against a known reference surface. Hand-shot
+      // photos differ slightly in native pixel aspect ratio (crop
+      // imprecision, lens distortion, hand-eye judgement) even when the
+      // physical framing is meant to be identical. Deriving width purely
+      // from each photo's own pixel aspect ratio (old behaviour) let that
+      // crop noise leak straight into the length calibration — e.g. a photo
+      // that's fractionally "wider than tall" relative to the true
+      // physWCm:physH ratio made the stitched canvas fractionally too long,
+      // which then threw off the cut-length segment math (a spurious extra
+      // sliver-thin segment at the end). Instead every image is forced to
+      // the exact same pixel width: physWCm scaled by the same px/cm as the
+      // height calibration, so length and width calibration both trace back
+      // to the physWCm/physH numbers you entered, not to per-photo framing
+      // drift. This means each image is drawn stretched/compressed slightly
+      // to that exact width — intentional, since the known physical size is
+      // more trustworthy than an individually hand-cropped photo's aspect
+      // ratio.
+      const targetW = Math.round(physWCm * (targetH / physH));
+      let totalW = imageQueue.length * targetW;
+
+      // If even the working-height total exceeds the hard width ceiling
+      // (huge batch of images), scale every image down proportionally so
+      // the canvas always stays within a safe size. This trades a little
+      // resolution for the ability to stitch unlimited images.
+      const widthScale = totalW > MAX_STITCH_WIDTH_PX ? MAX_STITCH_WIDTH_PX / totalW : 1;
+      const finalH = Math.max(1, Math.round(targetH * widthScale));
+      const finalDrawW = Math.max(1, Math.round(targetW * widthScale));
+
+      // Build offscreen stitched canvas
+      stitchedCanvas = document.createElement('canvas');
+      imgBoundaries = [];
+      let x = 0;
+      imageQueue.forEach((item, idx) => {
+        imgBoundaries.push({ imgIdx: idx, colStart: x, colEnd: x + finalDrawW, drawW: finalDrawW });
+        x += finalDrawW;
+      });
+      totalW = x;
+      stitchedCanvas.width = totalW;
+      stitchedCanvas.height = finalH;
+      const ctx = stitchedCanvas.getContext('2d');
+      imageQueue.forEach((item, idx) => {
+        const b = imgBoundaries[idx];
+        ctx.drawImage(item.img, b.colStart, 0, b.drawW, finalH);
+      });
+
+      // Show display canvas (scaled to fit viewport width)
+      const displayCanvas = document.getElementById('stitchCanvas');
+      const maxW = document.getElementById('stitchWrap').offsetWidth || 860;
+      const dispScale = Math.min(1, maxW / totalW);
+      displayCanvas.width  = Math.round(totalW * dispScale);
+      displayCanvas.height = Math.round(finalH * dispScale);
+      displayCanvas.getContext('2d').drawImage(stitchedCanvas, 0, 0, displayCanvas.width, displayCanvas.height);
+
+      const oc = document.getElementById('overlayCanvas');
+      oc.width = displayCanvas.width; oc.height = displayCanvas.height;
+      oc.style.width = displayCanvas.width + 'px';
+      oc.style.height = displayCanvas.height + 'px';
+
+      // Total physical length is now just imageCount × physWCm, exactly —
+      // no back-calculation from pixel counts needed, since every image was
+      // forced to exactly physWCm wide above.
+      const physWTotal = imageQueue.length * physWCm;
+      const downscaleNote = widthScale < 1 ? ` · downscaled ${(widthScale*100).toFixed(0)}% to fit ${imageQueue.length} images` : '';
+      document.getElementById('stitchLabel').textContent =
+        `Stitched: ${imageQueue.length} image${imageQueue.length>1?'s':''} · ${totalW}×${finalH} px · ${physWTotal.toFixed(1)} cm total${downscaleNote}`;
+
+      document.getElementById('stitchSection').classList.remove('hidden');
+      document.getElementById('resultSection').classList.add('hidden');
+      document.getElementById('cutResults').classList.add('hidden');
+
+      runDetection();
+    } finally {
+      stitchBtn.disabled = false;
+      stitchBtn.textContent = prevLabel;
+    }
+  });
+}
+
+
+
+// ═══════════════════════════════════════════════════════════
+// DETECTION METHODS
+// Each mask-builder returns a Uint8Array(imgW*imgH) where 1 = sliver pixel.
+// All operate on the same stitched image; user picks which one (or ensemble).
+// ═══════════════════════════════════════════════════════════
+
+// RGB (0-255 each) -> HSV with H in [0,360), S/V in [0,1]
+function rgbToHsv(r,g,b) {
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0;
+  if (d!==0) {
+    if (max===r) h=((g-b)/d)%6;
+    else if (max===g) h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h*=60; if(h<0) h+=360;
+  }
+  const s = max===0 ? 0 : d/max;
+  const v = max;
+  return [h,s,v];
+}
+function hueDist(a,b) { const d=Math.abs(a-b)%360; return d>180?360-d:d; }
+
+// sampled jute colours from colour-picker: [{h,s,v}, ...] (golden..pale-brown range)
+let juteSamples = [];
+function defaultJuteSamples() {
+  // sensible spread covering golden -> pale brownish jute if user hasn't sampled yet
+  return [
+    {h:35, s:0.55, v:0.55},  // golden/tan
+    {h:28, s:0.40, v:0.70},  // pale brown
+    {h:22, s:0.30, v:0.80},  // pale brownish-white
+  ];
+}
+
+function buildGray(data, imgW, imgH) {
+  const gray = new Float32Array(imgW*imgH);
+  for (let i=0;i<imgW*imgH;i++) gray[i]=(data[i*4]+data[i*4+1]+data[i*4+2])/3;
+  return gray;
+}
+
+// A) Brightness — simple global threshold on grayscale
+function maskBrightness(data, imgW, imgH, threshold) {
+  const gray = buildGray(data, imgW, imgH);
+  const mask = new Uint8Array(imgW*imgH);
+  for (let i=0;i<imgW*imgH;i++) if (gray[i]<threshold) mask[i]=1;
+  return mask;
+}
+
+// B) Adaptive — each pixel compared to local neighbourhood mean (per-column box blur)
+function maskAdaptive(data, imgW, imgH, offset, winSize) {
+  const gray = buildGray(data, imgW, imgH);
+  const mask = new Uint8Array(imgW*imgH);
+  const half = Math.floor(winSize/2);
+
+  // running vertical box-mean per column (cheap 1D pass; lighting in these
+  // shots varies mostly along sliver length/columns, not within a column)
+  for (let col=0; col<imgW; col++) {
+    // column mean via sliding window across nearby columns for local lighting estimate
+    const c0 = Math.max(0, col-half), c1 = Math.min(imgW-1, col+half);
+    let colSum=0, colCount=0;
+    for (let cc=c0; cc<=c1; cc++) {
+      for (let row=0; row<imgH; row++) { colSum+=gray[row*imgW+cc]; colCount++; }
+    }
+    const localMean = colSum/colCount;
+    for (let row=0; row<imgH; row++) {
+      const idx=row*imgW+col;
+      if (gray[idx] < localMean - offset) mask[idx]=1;
+    }
+  }
+  return mask;
+}
+
+// C) Edge — Sobel gradient magnitude, then fill between left/right edge per row-scan column
+function maskEdge(data, imgW, imgH, sensitivity) {
+  const gray = buildGray(data, imgW, imgH);
+  const mag = new Float32Array(imgW*imgH);
+  const at = (x,y) => gray[Math.min(imgH-1,Math.max(0,y))*imgW + Math.min(imgW-1,Math.max(0,x))];
+  for (let row=0; row<imgH; row++) {
+    for (let col=0; col<imgW; col++) {
+      const gx = (at(col+1,row-1)+2*at(col+1,row)+at(col+1,row+1)) - (at(col-1,row-1)+2*at(col-1,row)+at(col-1,row+1));
+      const gy = (at(col-1,row+1)+2*at(col,row+1)+at(col+1,row+1)) - (at(col-1,row-1)+2*at(col,row-1)+at(col+1,row-1));
+      mag[row*imgW+col] = Math.sqrt(gx*gx+gy*gy);
+    }
+  }
+  // per column: find topmost & bottommost row where gradient exceeds sensitivity,
+  // mark everything between them as sliver (edge detection finds the boundary,
+  // not the fill, so we reconstruct the band from the two strongest transitions)
+  const mask = new Uint8Array(imgW*imgH);
+  for (let col=0; col<imgW; col++) {
+    let top=-1, bot=-1;
+    for (let row=0; row<imgH; row++) {
+      if (mag[row*imgW+col] > sensitivity) { if(top===-1) top=row; bot=row; }
+    }
+    if (top!==-1 && bot>top) {
+      for (let row=top; row<=bot; row++) mask[row*imgW+col]=1;
+    }
+  }
+  return mask;
+}
+
+// D) HSV — matches against one or more sampled jute colours (covers golden..pale-brown spread)
+function maskHsv(data, imgW, imgH, hueTolerance) {
+  const samples = juteSamples.length ? juteSamples : defaultJuteSamples();
+  const mask = new Uint8Array(imgW*imgH);
+  for (let i=0;i<imgW*imgH;i++) {
+    const r=data[i*4], g=data[i*4+1], b=data[i*4+2];
+    const [h,s,v] = rgbToHsv(r,g,b);
+    for (let k=0;k<samples.length;k++) {
+      const samp = samples[k];
+      const satLo = Math.max(0.04, samp.s*0.45), satHi = Math.min(1, samp.s*1.7+0.08);
+      const valLo = Math.max(0.04, samp.v*0.45), valHi = Math.min(1, samp.v*1.45+0.05);
+      if (s>=satLo && s<=satHi && v>=valLo && v<=valHi && hueDist(h,samp.h)<=hueTolerance) {
+        mask[i]=1; break;
+      }
+    }
+  }
+  return mask;
+}
+
+// E) Ensemble — vote across brightness, adaptive, and HSV; pixel counts if >= votesNeeded agree
+function maskEnsemble(data, imgW, imgH, params, votesNeeded) {
+  const mB = maskBrightness(data, imgW, imgH, params.brightness);
+  const mA = maskAdaptive(data, imgW, imgH, params.adaptOffset, params.adaptWin);
+  const mH = maskHsv(data, imgW, imgH, params.hueTol);
+  const mask = new Uint8Array(imgW*imgH);
+  for (let i=0;i<imgW*imgH;i++) {
+    const votes = mB[i]+mA[i]+mH[i];
+    if (votes >= votesNeeded) mask[i]=1;
+  }
+  return mask;
+}
+
+// ── Boundary smoothing (post-detection) ──
+// Per-column detection is independent so the edge trace jitters even when
+// the underlying mass position is right. Median filter first (kills single
+// spike columns without dragging the line toward outliers), then a small
+// moving average to soften what's left. Nulls (no detection in that column)
+// are passed through unchanged — smoothing never invents a boundary where
+// none was found.
+function medianThenAvgSmooth(arr, medianRadius, avgRadius) {
+  const n = arr.length;
+  const med = new Array(n);
+  for (let i=0;i<n;i++) {
+    if (arr[i]===null) { med[i]=null; continue; }
+    const win=[];
+    for (let k=-medianRadius;k<=medianRadius;k++) {
+      const j=i+k; if (j>=0 && j<n && arr[j]!==null) win.push(arr[j]);
+    }
+    if (!win.length) { med[i]=arr[i]; continue; }
+    win.sort((a,b)=>a-b);
+    med[i]=win[Math.floor(win.length/2)];
+  }
+  const avgHalf = Math.max(1, Math.round(avgRadius/2));
+  const out = new Array(n);
+  for (let i=0;i<n;i++) {
+    if (med[i]===null) { out[i]=null; continue; }
+    let sum=0, cnt=0;
+    for (let k=-avgHalf;k<=avgHalf;k++) {
+      const j=i+k; if (j>=0 && j<n && med[j]!==null) { sum+=med[j]; cnt++; }
+    }
+    out[i]=cnt?sum/cnt:med[i];
+  }
+  return out;
+}
+
+function getSelectedMethod() {
+  const el = document.querySelector('input[name="detMethod"]:checked');
+  return el ? el.value : 'hsv';
+}
+
+// Shared by runDetection (full stitched image) AND the single-image preview
+// modal — reads the currently selected method + its slider values and
+// returns the boolean sliver mask for whatever pixel buffer you hand it.
+// Pulling this out means the big preview always reacts to the exact same
+// settings as the real detection, with no separate copy to keep in sync.
+function buildMaskForMethod(data, imgW, imgH) {
+  const method = getSelectedMethod();
+  let isSliver, methodLabel;
+
+  if (method === 'brightness') {
+    const threshold = parseInt(document.getElementById('threshSlider').value);
+    isSliver = maskBrightness(data, imgW, imgH, threshold);
+    methodLabel = `brightness <${threshold}`;
+
+  } else if (method === 'adaptive') {
+    const offset = parseInt(document.getElementById('adaptOffsetSlider').value);
+    const win = parseInt(document.getElementById('adaptWinSlider').value);
+    isSliver = maskAdaptive(data, imgW, imgH, offset, win);
+    methodLabel = `adaptive Δ${offset} win${win}`;
+
+  } else if (method === 'edge') {
+    const sens = parseInt(document.getElementById('edgeSlider').value);
+    isSliver = maskEdge(data, imgW, imgH, sens);
+    methodLabel = `edge (Sobel) sens${sens}`;
+
+  } else if (method === 'ensemble') {
+    const votes = parseInt(document.getElementById('voteSlider').value);
+    const params = {
+      brightness: parseInt(document.getElementById('threshSlider').value),
+      adaptOffset: parseInt(document.getElementById('adaptOffsetSlider').value),
+      adaptWin: parseInt(document.getElementById('adaptWinSlider').value),
+      hueTol: parseInt(document.getElementById('threshSliderHsv').value)
+    };
+    isSliver = maskEnsemble(data, imgW, imgH, params, votes);
+    methodLabel = `ensemble ${votes}/3 votes`;
+
+  } else { // hsv (default)
+    const hueTolerance = parseInt(document.getElementById('threshSliderHsv').value);
+    isSliver = maskHsv(data, imgW, imgH, hueTolerance);
+    const nSamp = juteSamples.length || defaultJuteSamples().length;
+    methodLabel = `HSV colour (${nSamp} sample${nSamp>1?'s':''}, ±${hueTolerance}°)`;
+  }
+  return { isSliver, methodLabel };
+}
+
+// ═══════════════════════════════════════════════════════════
+// SINGLE-IMAGE PREVIEW — full-size view of ONE queued image with the live
+// detection mask overlaid, so you can actually see what a slider (e.g. the
+// adaptive method's local contrast offset) is doing. With 15-20 images
+// stitched into one strip, each individual photo is only a sliver of
+// screen width — nowhere near enough to judge a threshold by eye. This
+// opens one image at native/full size instead and re-renders the mask live
+// as you drag any slider, without re-stitching the whole queue.
+// ═══════════════════════════════════════════════════════════
+let previewIdx = null;
+
+function openImagePreview(idx) {
+  const item = imageQueue[idx];
+  if (!item || !item.loaded) return;
+  previewIdx = idx;
+
+  document.getElementById('previewModalTitle').textContent = `Image #${idx+1} of ${imageQueue.length}`;
+  document.getElementById('previewModal').classList.remove('hidden');
+
+  const base = document.getElementById('previewBaseCanvas');
+  base.width = item.img.width;
+  base.height = item.img.height;
+  base.getContext('2d').drawImage(item.img, 0, 0);
+
+  renderPreviewMask();
+}
+
+function closeImagePreview() {
+  previewIdx = null;
+  document.getElementById('previewModal').classList.add('hidden');
+}
+
+function renderPreviewMask() {
+  if (previewIdx === null) return;
+  const item = imageQueue[previewIdx];
+  if (!item || !item.loaded) return;
+
+  const mc = document.getElementById('previewMaskCanvas');
+  const w = item.img.width, h = item.img.height;
+  mc.width = w; mc.height = h;
+
+  if (!document.getElementById('previewOverlayToggle').checked) {
+    mc.getContext('2d').clearRect(0, 0, w, h);
+    return;
+  }
+
+  // Run the SAME mask builder used by the real stitched-image detection, on
+  // this one image's own raw pixels at full resolution — so the offset's
+  // effect is visible at the actual pixel scale, not shrunk into a thin
+  // stitched strip.
+  const base = document.getElementById('previewBaseCanvas');
+  const data = base.getContext('2d').getImageData(0, 0, w, h).data;
+  const { isSliver } = buildMaskForMethod(data, w, h);
+
+  const mctx = mc.getContext('2d');
+  const imgData = mctx.createImageData(w, h);
+  for (let i = 0; i < w*h; i++) {
+    if (isSliver[i]) {
+      imgData.data[i*4]   = 255;   // red highlight over detected sliver pixels
+      imgData.data[i*4+1] = 60;
+      imgData.data[i*4+2] = 40;
+      imgData.data[i*4+3] = 130;   // semi-transparent so the photo still shows through
+    }
+  }
+  mctx.putImageData(imgData, 0, 0);
+}
+
+document.getElementById('previewModalClose').addEventListener('click', closeImagePreview);
+document.getElementById('previewModal').addEventListener('click', (e) => {
+  if (e.target.id === 'previewModal') closeImagePreview(); // click outside the card closes it
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && previewIdx !== null) closeImagePreview();
+});
+document.getElementById('previewOverlayToggle').addEventListener('change', renderPreviewMask);
+
+// Every detection-related slider/control re-renders the open preview live,
+// in addition to whatever else it already triggers (re-detect on the full
+// stitched image still needs its own explicit "Re-detect" click — that one
+// stays as-is since it's heavier; this preview is cheap enough to be instant).
+['threshSlider','adaptOffsetSlider','adaptWinSlider','edgeSlider','threshSliderHsv',
+ 'voteSlider','densitySlider'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', () => { if (previewIdx !== null) renderPreviewMask(); });
+});
+document.querySelectorAll('input[name="detMethod"]').forEach(r => {
+  r.addEventListener('change', () => { if (previewIdx !== null) renderPreviewMask(); });
+});
+
+function runDetection() {
+  if (!stitchedCanvas) return;
+  const physH = parseFloat(document.getElementById('refH').value) || 7;
+  const imgW = stitchedCanvas.width, imgH = stitchedCanvas.height;
+  const data = stitchedCanvas.getContext('2d').getImageData(0,0,imgW,imgH).data;
+
+  // ── Calibration ──
+  // pxPerCm is derived from THIS sample's own image height (imgH) against
+  // the physical height (physH cm) — not from the reference photo's pixel
+  // count. Reference and sample photos are taken by hand and cropped
+  // independently, so their PIXEL dimensions will naturally differ even
+  // when they frame the exact same PHYSICAL height. Comparing raw pixel
+  // heights between reference and sample would just be comparing two
+  // unrelated resolutions and flag normal, expected variation as an
+  // "error" — so we don't do that. Each image is scaled to physH using
+  // its own pixel height, which is the correct per-photo conversion
+  // regardless of how the reference (or any other sample) was cropped.
+  const pxPerCm = imgH / physH;
+
+  const { isSliver, methodLabel } = buildMaskForMethod(data, imgW, imgH);
+
+
+
+  // ── Column scan: find the DENSE fiber mass, ignore sparse wispy strands ──
+  // Wispy/fluffy textures (loose hairs poking above the main mass, gaps in
+  // shadow) produce isolated "hit" pixels that a naive longest-run+gap-bridge
+  // scan happily strings together into a false run spanning the whole column.
+  // Fix: build runs the same way, but score each run by DENSITY (hits / span)
+  // rather than raw span length, and require a minimum density to qualify as
+  // "the sliver". This favours the solid mass over thin gap-bridged wisps.
+  //
+  // FRAYING: when a sliver splits into 2+ separate strands with real
+  // background visible between them, each strand is its own qualifying run.
+  // We keep ALL qualifying runs per column (not just the longest) and sum
+  // their individual widths — this excludes the gap between strands from
+  // the width measurement, instead of the old behaviour where the longest
+  // run absorbed both strands plus the gap into one inflated span.
+  const GAP = 5;            // max pixel gap to bridge WITHIN a single strand
+  const MIN_DENSITY = (parseInt(document.getElementById('densitySlider').value)||35)/100; // run must be at least this fraction actual hits
+  const MIN_RUN_LEN = 5;    // minimum span to even consider
+  const frayDetect = document.getElementById('frayToggle').checked; // OFF by default — experimental, known buggy
+
+  const widthsPx=[], topEdge=[], botEdge=[];
+  const colRuns=[]; // per column: array of qualifying {start,end} runs (for overlay + CSV), null if none
+  for (let col=0;col<imgW;col++) {
+    const hit=[];
+    for (let row=0;row<imgH;row++) { if(isSliver[row*imgW+col]) hit.push(row); }
+    if (hit.length<MIN_RUN_LEN) { widthsPx.push(null);topEdge.push(null);botEdge.push(null);colRuns.push(null);continue; }
+
+    // build all gap-bridged runs, tracking hit-count (not just span) per run
+    const runs=[]; // {start,end,hits}
+    let rS=hit[0], rE=hit[0], rHits=1;
+    for (let k=1;k<hit.length;k++) {
+      if (hit[k]-hit[k-1]<=GAP) { rE=hit[k]; rHits++; }
+      else { runs.push({start:rS,end:rE,hits:rHits}); rS=hit[k]; rE=hit[k]; rHits=1; }
+    }
+    runs.push({start:rS,end:rE,hits:rHits});
+
+    if (!frayDetect) {
+      // ── OFF (default): original behaviour — single longest qualifying run ──
+      let best=null;
+      for (const r of runs) {
+        const span = r.end-r.start+1;
+        if (span<MIN_RUN_LEN) continue;
+        const density = r.hits/span;
+        if (density<MIN_DENSITY) continue;
+        if (!best || span>(best.end-best.start+1)) best=r;
+      }
+      if (!best) { widthsPx.push(null);topEdge.push(null);botEdge.push(null);colRuns.push(null);continue; }
+      const w=best.end-best.start; if(w<MIN_RUN_LEN){widthsPx.push(null);topEdge.push(null);botEdge.push(null);colRuns.push(null);continue;}
+      widthsPx.push(w);topEdge.push(best.start);botEdge.push(best.end);colRuns.push([{start:best.start,end:best.end}]);
+      continue;
+    }
+
+    // ── ON (experimental): keep every run that passes length + density — ──
+    // these are the distinct fiber strands in this column (usually 1,
+    // occasionally 2+ when frayed) — and sum their widths, excluding gaps.
+    const qualifying = runs.filter(r => {
+      const span = r.end-r.start+1;
+      return span>=MIN_RUN_LEN && (r.hits/span)>=MIN_DENSITY;
+    });
+
+    if (!qualifying.length) { widthsPx.push(null);topEdge.push(null);botEdge.push(null);colRuns.push(null);continue; }
+
+    const totalW = qualifying.reduce((sum,r)=>sum+(r.end-r.start),0);
+    if (totalW < MIN_RUN_LEN) { widthsPx.push(null);topEdge.push(null);botEdge.push(null);colRuns.push(null);continue; }
+
+    widthsPx.push(totalW);
+    // topEdge/botEdge kept as the outer envelope (for the simple single-line
+    // overlay + profile chart fallback); colRuns carries the real per-strand
+    // bands for accurate drawing and export.
+    topEdge.push(Math.min(...qualifying.map(r=>r.start)));
+    botEdge.push(Math.max(...qualifying.map(r=>r.end)));
+    colRuns.push(qualifying.map(r=>({start:r.start,end:r.end})));
+  }
+
+  // ── Smoothing ──
+  // Per-column detection is independent, so the boundary jitters column to
+  // column even when the underlying widths are basically right (this is
+  // visual noise, not a detection error). Smooth AFTER detection: a median
+  // filter first removes one-off spike columns without blurring genuine
+  // transitions, then a light moving average softens the remaining jitter.
+  //
+  // IMPORTANT: drawOverlay reads from colRuns (per-strand bands), NOT from
+  // topEdge/botEdge, whenever colRuns is present — which is always, now that
+  // colRuns is populated even in the no-fray single-strand case. So smoothing
+  // must update colRuns too, or the overlay silently keeps drawing the raw
+  // unsmoothed line while only the off-screen metrics/chart get smoothed.
+  //
+  // For frayed columns (colRuns[col].length > 1) we deliberately skip
+  // smoothing that column's bands — smoothing across a real strand split
+  // would blur the two strands back toward each other, which is the wrong
+  // direction. Only single-strand columns get their edges smoothed.
+  const smoothPx = parseInt(document.getElementById('smoothSlider').value) || 0;
+  if (smoothPx > 0) {
+    const medianRadius = Math.max(1, Math.round(smoothPx/2));
+    const smoothedTop = medianThenAvgSmooth(topEdge, medianRadius, smoothPx);
+    const smoothedBot = medianThenAvgSmooth(botEdge, medianRadius, smoothPx);
+    const smoothedWidth = medianThenAvgSmooth(widthsPx, medianRadius, smoothPx);
+    for (let col=0; col<imgW; col++) {
+      if (smoothedTop[col]===null || smoothedBot[col]===null) {
+        topEdge[col]=null; botEdge[col]=null; widthsPx[col]=null; colRuns[col]=null;
+        continue;
+      }
+      topEdge[col]=smoothedTop[col]; botEdge[col]=smoothedBot[col];
+      widthsPx[col] = (smoothedWidth[col]===null) ? null : smoothedWidth[col];
+
+      const runs = colRuns[col];
+      if (runs && runs.length===1) {
+        // single strand: keep colRuns in sync with the smoothed envelope so
+        // the overlay line actually shows the smoothed boundary
+        colRuns[col] = [{start: smoothedTop[col], end: smoothedBot[col]}];
+      }
+      // multi-strand (frayed) columns: leave colRuns as-is, unsmoothed —
+      // see note above on why we don't smooth across a real fray gap
+    }
+  }
+
+  const valid = widthsPx.filter(v=>v!==null);
+  if (!valid.length) { alert('No sliver detected with this method/settings. Try a different detection method, sample the sliver colour (HSV), lower the hairyness filter (density), or adjust the threshold slider.'); return; }
+
+  const pxPerMm = pxPerCm / 10;
+  lastWidthsPx=widthsPx; lastPxPerMm=pxPerMm; lastPxPerCm=pxPerCm;
+  lastTopEdge=topEdge; lastBotEdge=botEdge; lastColRuns=colRuns;
+
+  const avgPx=valid.reduce((a,b)=>a+b,0)/valid.length;
+  const minPx=Math.min(...valid), maxPx=Math.max(...valid);
+  const stdPx=Math.sqrt(valid.reduce((a,b)=>a+(b-avgPx)**2,0)/valid.length);
+  const mm=px=>(px/pxPerMm).toFixed(2);
+
+  // Draw on display canvas (scaled)
+  drawOverlay(topEdge, botEdge, imgW, imgH, null, colRuns);
+  drawProfile(widthsPx, pxPerMm);
+
+  document.getElementById('metricsGrid').innerHTML=`
+    <div class="metric hl"><div class="mlabel">Avg Width</div><div class="mval">${mm(avgPx)}<span> mm</span></div></div>
+    <div class="metric"><div class="mlabel">Min</div><div class="mval">${mm(minPx)}<span> mm</span></div></div>
+    <div class="metric"><div class="mlabel">Max</div><div class="mval">${mm(maxPx)}<span> mm</span></div></div>
+    <div class="metric"><div class="mlabel">Std Dev</div><div class="mval">${mm(stdPx)}<span> mm</span></div></div>
+    <div class="metric"><div class="mlabel">Cols used</div><div class="mval">${valid.length}<span>/${imgW}</span></div></div>
+    <div class="metric"><div class="mlabel">Scale</div><div class="mval" style="font-size:1rem;">${pxPerMm.toFixed(1)}<span> px/mm</span></div></div>
+  `;
+  document.getElementById('statusMsg').textContent =
+    `✓ ${valid.length} cols · ${pxPerMm.toFixed(1)} px/mm · ${physH} cm FOV · method: ${methodLabel} · density≥${Math.round(MIN_DENSITY*100)}% · smooth${smoothPx>0?'±'+smoothPx+'px':' off'} · fray-detect ${frayDetect?'ON (experimental)':'off'} · ${imageQueue.length} image(s) stitched`;
+  document.getElementById('statusMsg').className='status-msg ok';
+  document.getElementById('resultSection').classList.remove('hidden');
+  document.getElementById('cutResults').classList.add('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CUT-LENGTH ANALYSIS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('cutBtn').addEventListener('click', analyseCuts);
+
+function analyseCuts() {
+  if (!lastWidthsPx) { alert('Run Stitch & Measure first.'); return; }
+  const cutCm = parseFloat(document.getElementById('cutLen').value);
+  if (!cutCm || cutCm<=0) { alert('Enter a valid cut length.'); return; }
+
+  const imgW = lastWidthsPx.length;
+  const segPx = Math.round(cutCm * lastPxPerCm);
+  const numSegs = Math.ceil(imgW / segPx);
+
+  if (numSegs < 1) {
+    alert(`Cut length ${cutCm} cm is larger than the full stitched length. Add more images or use a shorter cut.`);
+    return;
+  }
+
+  const segments = [];
+  for (let s=0;s<numSegs;s++) {
+    const colStart = s*segPx;
+    const colEnd   = Math.min(colStart+segPx, imgW);
+    const slice    = lastWidthsPx.slice(colStart,colEnd).filter(v=>v!==null);
+    if (!slice.length) continue;
+
+    const avgMm = slice.reduce((a,b)=>a+b,0)/slice.length / lastPxPerMm;
+    const minMm = Math.min(...slice)/lastPxPerMm;
+    const maxMm = Math.max(...slice)/lastPxPerMm;
+    const posSCm = colStart/lastPxPerCm;
+    const posECm = colEnd/lastPxPerCm;
+
+    // which source images overlap this segment?
+    const srcImgs = imgBoundaries
+      .filter(b => b.colEnd > colStart && b.colStart < colEnd)
+      .map(b => `#${b.imgIdx+1}`).join(', ');
+
+    segments.push({s:s+1, colStart, colEnd, posSCm, posECm, avgMm, minMm, maxMm, cols:slice.length, srcImgs});
+  }
+  lastSegments = segments;
+
+  const segAvgs = segments.map(s=>s.avgMm);
+  const segMax = Math.max(...segAvgs), segMin = Math.min(...segAvgs);
+  const segAvgAll = segAvgs.reduce((a,b)=>a+b,0)/segAvgs.length;
+  // CV (coefficient of variation) = stddev / mean × 100 — NOT (max-min)/mean.
+  // That older formula was just the "range" expressed as a % of the mean,
+  // which only looks at the two most extreme segments and ignores how the
+  // other segments are distributed. True CV uses every segment's deviation
+  // from the mean, which is the standard textile/QC definition of CV% and
+  // what lets results be compared apples-to-apples against spec sheets.
+  const segVariance = segAvgs.reduce((a,b)=>a+(b-segAvgAll)**2,0)/segAvgs.length;
+  const segStd = Math.sqrt(segVariance);
+  const cv = (segAvgAll>0 ? (segStd/segAvgAll*100) : 0).toFixed(1);
+
+  // "vs Overall" reference = average of the segment averages themselves
+  // (segAvgAll) — i.e. the plain average of every row in this table — not
+  // the column-weighted average across all raw pixel columns. These differ
+  // whenever segments have unequal column counts (e.g. a shorter final
+  // segment), so the delta column now matches what "average of all" means
+  // looking at the table: mean of the Avg(mm) column.
+  const globalAvgMm = segAvgAll;
+
+  drawVarChart(segments, globalAvgMm);
+  drawOverlay(lastTopEdge, lastBotEdge, lastWidthsPx.length, stitchedCanvas.height, segments, lastColRuns);
+
+  const tbody = document.getElementById('segBody');
+  tbody.innerHTML='';
+  segments.forEach(seg => {
+    const diff=seg.avgMm-globalAvgMm;
+    const ds=(diff>=0?'+':'')+diff.toFixed(2);
+    const dc=Math.abs(diff)>globalAvgMm*0.08?(diff>0?'#2a7a3a':'#9b3a2a'):'var(--muted)';
+    const barPct=Math.min(100,(seg.avgMm/segMax)*100);
+    tbody.innerHTML+=`<tr>
+      <td>${seg.s}</td>
+      <td>${seg.posSCm.toFixed(1)} cm</td>
+      <td>${seg.posECm.toFixed(1)} cm</td>
+      <td class="avgv">${seg.avgMm.toFixed(2)}</td>
+      <td>${seg.minMm.toFixed(2)}</td>
+      <td>${seg.maxMm.toFixed(2)}</td>
+      <td><span class="img-source-chip">${seg.srcImgs}</span></td>
+      <td style="color:${dc};font-family:monospace;">${ds} mm</td>
+      <td><div class="bar-bg"><div class="bar-fill" style="width:${barPct}%"></div></div></td>
+    </tr>`;
+  });
+
+  document.getElementById('segSummary').textContent =
+    `${segments.length} segments of ${cutCm} cm · avg ${segAvgAll.toFixed(2)} mm · range ${segMin.toFixed(2)}–${segMax.toFixed(2)} mm · CV (stddev/mean) = ${cv}%`;
+  document.getElementById('segSummary').className='status-msg ok';
+  document.getElementById('cutResults').classList.remove('hidden');
+
+  // stash the last analysed cut length alongside the segments, for the
+  // "Send to Mass Variation" handoff below
+  window.lastCutLenCm = cutCm;
+  const sendBtn = document.getElementById('sendToMVBtn');
+  if (sendBtn) sendBtn.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════
+// HANDOFF — Send to Mass Variation
+// Packages the per-segment average widths (already calibrated to mm) as a
+// ready-made "Width (mm)" measurement set and hands it to the Mass
+// Variation tool via sessionStorage. Mass Variation reads this on load,
+// auto-fills a sample panel with these values plus the cut length used
+// here, and runs its own CV%/control-limit analysis on the real
+// photo-derived numbers — no retyping needed.
+// ═══════════════════════════════════════════════════════════
+document.getElementById('sendToMVBtn').addEventListener('click', () => {
+  if (!lastSegments || !lastSegments.length) {
+    alert('Run "Analyse Segments" first.');
+    return;
+  }
+  const values = lastSegments.map(s => +s.avgMm.toFixed(3));
+  const payload = {
+    source: 'sliver-width',
+    createdAt: new Date().toISOString(),
+    cutLengthCm: window.lastCutLenCm || null,
+    values,
+    label: 'Sliver Width photo batch — ' + new Date().toLocaleString()
+  };
+  try {
+    sessionStorage.setItem('sliverWidthTransfer', JSON.stringify(payload));
+  } catch (e) {
+    alert('Could not prepare handoff data: ' + e.message);
+    return;
+  }
+  const statusEl = document.getElementById('sendToMVStatus');
+  statusEl.textContent = `Sending ${values.length} measurements to Mass Variation…`;
+  statusEl.classList.remove('hidden');
+  setTimeout(() => { window.location.href = '/mass-variation'; }, 400);
+});
+
+// ═══════════════════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════════════════
+function drawOverlay(topEdge, botEdge, imgW, imgH, segments, colRuns) {
+  const dispC = document.getElementById('stitchCanvas');
+  const oc    = document.getElementById('overlayCanvas');
+  const scaleX = dispC.width  / imgW;
+  const scaleY = dispC.height / imgH;
+  oc.width = dispC.width; oc.height = dispC.height;
+  const ctx = oc.getContext('2d');
+  ctx.clearRect(0,0,oc.width,oc.height);
+
+  if (colRuns && colRuns.length) {
+    // Draw each detected strand's top+bottom edge separately. When a column
+    // has 2+ runs (frayed sliver), this draws two distinct bands with a real
+    // visible gap between them — instead of one line spanning across the
+    // fray, which is what made the gap look like part of the measured width.
+    const maxStrands = colRuns.reduce((m,r)=>r?Math.max(m,r.length):m, 1);
+    const STRAND_COLORS = ['rgba(255,80,0,0.9)','rgba(0,140,255,0.9)','rgba(0,170,90,0.9)','rgba(200,0,180,0.9)'];
+    for (let s=0; s<maxStrands; s++) {
+      const drawStrandLine = (which) => {
+        ctx.strokeStyle = STRAND_COLORS[s%STRAND_COLORS.length];
+        ctx.lineWidth=1.5; ctx.beginPath(); let first=true;
+        colRuns.forEach((runs,c)=>{
+          if (!runs || !runs[s]) { first=true; return; }
+          const v = which==='top' ? runs[s].start : runs[s].end;
+          const x=c*scaleX, y=v*scaleY;
+          first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
+        });
+        ctx.stroke();
+      };
+      drawStrandLine('top');
+      drawStrandLine('bot');
+    }
+  } else {
+    // fallback: simple envelope line (no per-strand data available)
+    const drawLine = (edgeArr, color) => {
+      ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.beginPath(); let first=true;
+      edgeArr.forEach((v,c)=>{
+        if(v===null){first=true;return;}
+        const x=c*scaleX, y=v*scaleY;
+        first?(ctx.moveTo(x,y),first=false):ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    };
+    drawLine(topEdge,'rgba(255,80,0,0.85)');
+    drawLine(botEdge,'rgba(255,80,0,0.85)');
+  }
+
+  // image boundary markers
+  imgBoundaries.forEach((b,i)=>{
+    if(i===0) return;
+    const x = b.colStart * scaleX;
+    ctx.strokeStyle='rgba(100,100,255,0.5)'; ctx.lineWidth=1.5; ctx.setLineDash([5,3]);
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,oc.height); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(100,100,255,0.7)'; ctx.font='9px monospace'; ctx.textAlign='left';
+    ctx.fillText(`#${i+1}`, x+3, 12);
+  });
+
+  // segment overlays
+  if (segments && segments.length) {
+    const COLS=['rgba(122,92,46,0.07)','rgba(196,160,106,0.11)'];
+    segments.forEach((seg,i)=>{
+      const x0=seg.colStart*scaleX, x1=seg.colEnd*scaleX, W=x1-x0;
+      ctx.fillStyle=COLS[i%2]; ctx.fillRect(x0,0,W,oc.height);
+      if(i>0){ ctx.strokeStyle='rgba(122,92,46,0.55)'; ctx.lineWidth=1.2; ctx.setLineDash([6,3]); ctx.beginPath(); ctx.moveTo(x0,0); ctx.lineTo(x0,oc.height); ctx.stroke(); ctx.setLineDash([]); }
+      const fs=Math.min(13,Math.max(8,W*0.07));
+      ctx.fillStyle='rgba(122,92,46,0.85)'; ctx.font=`bold ${fs}px monospace`; ctx.textAlign='center';
+      ctx.fillText(`S${seg.s}`,x0+W/2,18);
+      if(W>50) ctx.fillText(`${seg.avgMm.toFixed(1)}mm`,x0+W/2,18+fs+2);
+      ctx.textAlign='left';
+    });
+  }
+}
+
+function drawProfile(widthsPx, pxPerMm) {
+  const pc=document.getElementById('profileCanvas');
+  const ctx=pc.getContext('2d');
+  const W=pc.offsetWidth||800, H=90;
+  pc.width=W; pc.height=H;
+  const vals=widthsPx.filter(v=>v!==null);
+  if(!vals.length) return;
+  const maxV=Math.max(...vals);
+  const avgP=vals.reduce((a,b)=>a+b,0)/vals.length;
+
+  ctx.fillStyle='#faf8f5'; ctx.fillRect(0,0,W,H);
+
+  // image boundary ticks
+  imgBoundaries.forEach((b,i)=>{
+    if(i===0)return;
+    const x=b.colStart/widthsPx.length*W;
+    ctx.strokeStyle='rgba(100,100,255,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); ctx.setLineDash([]);
+  });
+
+  const avgY=H-(avgP/maxV)*(H-14)-7;
+  ctx.strokeStyle='rgba(196,160,106,0.6)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(0,avgY); ctx.lineTo(W,avgY); ctx.stroke(); ctx.setLineDash([]);
+
+  // fill + line
+  ctx.beginPath(); let st=false;
+  widthsPx.forEach((v,i)=>{
+    if(v===null){if(st)ctx.lineTo(i/widthsPx.length*W,H);st=false;return;}
+    const x=i/widthsPx.length*W,y=H-(v/maxV)*(H-14)-7;
+    if(!st){ctx.moveTo(x,H);ctx.lineTo(x,y);st=true;}else ctx.lineTo(x,y);
+  });
+  ctx.lineTo(W,H); ctx.closePath(); ctx.fillStyle='rgba(122,92,46,0.12)'; ctx.fill();
+
+  ctx.beginPath(); st=false;
+  widthsPx.forEach((v,i)=>{
+    if(v===null){st=false;return;}
+    const x=i/widthsPx.length*W,y=H-(v/maxV)*(H-14)-7;
+    st?ctx.lineTo(x,y):ctx.moveTo(x,y); st=true;
+  });
+  ctx.strokeStyle='#7a5c2e'; ctx.lineWidth=1.5; ctx.stroke();
+
+  ctx.fillStyle='#7a5c2e'; ctx.font='10px monospace';
+  ctx.fillText(`avg ${(avgP/pxPerMm).toFixed(1)} mm`, 6, avgY-4);
+}
+
+function drawVarChart(segs, globalAvgMm) {
+  const vc=document.getElementById('varCanvas');
+  const ctx=vc.getContext('2d');
+  const W=vc.offsetWidth||800, H=130;
+  vc.width=W; vc.height=H;
+  ctx.fillStyle='#faf8f5'; ctx.fillRect(0,0,W,H);
+
+  const allV=segs.flatMap(s=>[s.minMm,s.maxMm]);
+  const maxV=Math.max(...allV), minV=Math.min(...allV);
+  const range=maxV-minV||1;
+  const pad=16;
+  const toY=v=>H-pad-((v-minV)/range)*(H-pad*2);
+
+  const gY=toY(globalAvgMm);
+  ctx.strokeStyle='rgba(196,160,106,0.7)'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+  ctx.beginPath(); ctx.moveTo(0,gY); ctx.lineTo(W,gY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='rgba(196,160,106,0.9)'; ctx.font='9px monospace';
+  ctx.fillText(`overall avg ${globalAvgMm.toFixed(2)} mm`, 4, gY-3);
+
+  const step=(W-20)/segs.length, barW=Math.max(4,step-4);
+  segs.forEach((seg,i)=>{
+    const x=10+i*step;
+    const minY=toY(seg.minMm), maxY=toY(seg.maxMm), avgY=toY(seg.avgMm);
+    ctx.fillStyle='rgba(196,160,106,0.2)'; ctx.fillRect(x+barW*.2,maxY,barW*.6,minY-maxY);
+    const above=seg.avgMm>=globalAvgMm;
+    ctx.fillStyle=above?'rgba(58,122,74,0.7)':'rgba(155,58,42,0.65)';
+    const bY=toY(globalAvgMm);
+    above?ctx.fillRect(x,avgY,barW,bY-avgY):ctx.fillRect(x,bY,barW,avgY-bY);
+    ctx.fillStyle='#7a5c2e'; ctx.beginPath(); ctx.arc(x+barW/2,avgY,3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#7a7068'; ctx.font='8px monospace'; ctx.textAlign='center';
+    ctx.fillText(`S${seg.s}`,x+barW/2,H-2); ctx.textAlign='left';
+  });
+
+  ctx.beginPath();
+  segs.forEach((seg,i)=>{ const x=10+i*step+barW/2; i===0?ctx.moveTo(x,toY(seg.avgMm)):ctx.lineTo(x,toY(seg.avgMm)); });
+  ctx.strokeStyle='rgba(122,92,46,0.5)'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!lastSegments) return;
+  const rows=['Segment,Start(cm),End(cm),Avg(mm),Min(mm),Max(mm),Cols,SourceImages'];
+  lastSegments.forEach(s=>rows.push(`${s.s},${s.posSCm.toFixed(2)},${s.posECm.toFixed(2)},${s.avgMm.toFixed(3)},${s.minMm.toFixed(3)},${s.maxMm.toFixed(3)},${s.cols},"${s.srcImgs}"`));
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+  a.download='sliver_segments.csv'; a.click();
+});
+
+// ═══════════════════════════════════════════════════════════
+// PARAMETER SLIDERS — live value display for every method
+// ═══════════════════════════════════════════════════════════
+function wireSlider(sliderId, valId) {
+  const s = document.getElementById(sliderId);
+  const v = document.getElementById(valId);
+  if (!s || !v) return;
+  s.addEventListener('input', () => { v.textContent = s.value; });
+}
+wireSlider('threshSlider', 'threshVal');
+wireSlider('adaptOffsetSlider', 'adaptOffsetVal');
+wireSlider('adaptWinSlider', 'adaptWinVal');
+wireSlider('edgeSlider', 'edgeVal');
+wireSlider('threshSliderHsv', 'threshValHsv');
+wireSlider('voteSlider', 'voteVal');
+wireSlider('densitySlider', 'densityVal');
+wireSlider('smoothSlider', 'smoothVal');
+
+// ═══════════════════════════════════════════════════════════
+// DRAG-DROP HELPER
+// ═══════════════════════════════════════════════════════════
+function setupDrop(zoneId, inputId, multi=false) {
+  const zone=document.getElementById(zoneId);
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+  zone.addEventListener('drop',e=>{
+    e.preventDefault(); zone.classList.remove('drag');
+    const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/'));
+    if(!files.length) return;
+    if(zoneId==='sampleZone'){ addFiles(files); }
+    else {
+      const inp=document.getElementById(inputId);
+      const dt=new DataTransfer(); dt.items.add(files[0]); inp.files=dt.files;
+      inp.dispatchEvent(new Event('change'));
+    }
+  });
+}
+
+updateCalib();
+
+  </script>
+</body>
+</html>

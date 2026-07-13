@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mass Variation Report — Jute Sliver Analyzer</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+/* ── Quality badges ── */
+.quality-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:700; letter-spacing:0.03em; }
+.qb-good     { background:#d4f5e9; color:#0e7a55; }
+.qb-moderate { background:#fef0cc; color:#8a5a00; }
+.qb-poor     { background:#fde4e4; color:#b52020; }
+
+/* ── Stat cards ── */
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-bottom:1rem; }
+.stat-card { background:#faf9f6; border:1px solid #e4e1d9; border-radius:8px; padding:0.85rem 1rem; }
+.stat-card.warn   { background:#fff8f0; border-color:#f0d090; }
+.stat-card.danger { background:#fff2f2; border-color:#f0b0b0; }
+.stat-val { font-size:20px; font-weight:700; color:#1d1d1b; }
+.stat-lbl { font-size:11px; color:#6b6a64; margin-top:2px; }
+.stat-desc{ font-size:10px; color:#9a9890; margin-top:3px; font-style:italic; }
+
+/* ── Distribution bar ── */
+.dist-bar-bg { height:12px; border-radius:6px; overflow:hidden; background:#f0ede6; display:flex; margin:6px 0; }
+.dist-seg { height:100%; }
+.dist-legend { display:flex; gap:14px; font-size:11px; color:#6b6a64; }
+.dist-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+
+/* ── Compare table ── */
+.compare-table { width:100%; border-collapse:collapse; font-size:13px; }
+.compare-table th { text-align:left; padding:6px 8px; font-size:11px; font-weight:600; color:#6b6a64; border-bottom:1px solid #e4e1d9; text-transform:uppercase; letter-spacing:0.04em; }
+.compare-table td { padding:5px 8px; border-bottom:1px solid #f0ede6; }
+
+/* ── Page header ── */
+.rpt-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px; }
+.rpt-title  { font-size:22px; font-weight:700; color:#1d1d1b; }
+.rpt-meta   { font-size:12px; color:#6b6a64; margin-top:4px; }
+
+/* ── Section heading ── */
+.section-label { font-size:11px; font-weight:700; color:#6b6a64; text-transform:uppercase; letter-spacing:0.07em; border-bottom:1px solid #e4e1d9; padding-bottom:6px; margin:1.25rem 0 0.75rem; }
+
+/* ── Sample header ── */
+.sample-header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:0.75rem; }
+.sample-name { font-size:17px; font-weight:700; }
+.machine-tag { font-size:11px; background:#eef2f7; color:#185fa5; padding:2px 8px; border-radius:10px; }
+.cut-tag { font-size:11px; color:#6b6a64; }
+
+/* ── Chart wrapper ── */
+.charts-row { display:flex; gap:1.5rem; flex-wrap:wrap; margin-top:0.75rem; }
+.chart-col { flex:1; min-width:260px; }
+.chart-title { font-size:12px; font-weight:600; color:#1d1d1b; margin-bottom:6px; }
+.chart-note  { font-size:11px; color:#6b6a64; margin-top:5px; }
+canvas { display:block; border-radius:6px; width:100%; }
+
+/* ── Notes ── */
+.notes-box { font-size:12px; color:#6b6a64; padding:8px 12px; background:#f5f4f1; border-radius:6px; margin-top:0.75rem; }
+
+/* ── Print / action bar ── */
+.action-bar { display:flex; gap:10px; margin-bottom:1.5rem; flex-wrap:wrap; }
+.btn-print { padding:8px 18px; font-size:13px; font-weight:600; background:#185fa5; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+.btn-print:hover { background:#1450a0; }
+.btn-back { padding:8px 14px; font-size:13px; background:#fff; color:#1d1d1b; border:1px solid #d6d3ca; border-radius:6px; cursor:pointer; }
+.btn-back:hover { background:#f5f4f1; }
+
+/* ── Print styles ── */
+@media print {
+  .action-bar, .topbar { display:none !important; }
+  body { background:#fff !important; }
+  .page { padding:0.5rem 1rem !important; max-width:100% !important; }
+  .card { break-inside:avoid; box-shadow:none !important; border:1px solid #ccc !important; }
+  .stat-card { break-inside:avoid; }
+  canvas { max-width:100%; }
+  .charts-row { flex-wrap:nowrap; }
+  .rpt-watermark { display:block !important; }
+}
+.rpt-watermark {
+  display:none;
+  position:fixed; bottom:10px; right:14px;
+  font-size:10px; color:#bbb;
+}
+
+/* ── Empty state ── */
+.empty-state { text-align:center; padding:3rem 1rem; color:#6b6a64; font-size:15px; }
+</style>
+</head>
+<body>
+<div class="topbar" id="topbar"></div>
+
+<div class="page">
+  <div class="action-bar" id="actionBar">
+    <button class="btn-back" onclick="location.href='/mass-variation'">← Back</button>
+    <button class="btn-print" onclick="window.print()">🖨 Print / Save PDF</button>
+  </div>
+
+  <div id="reportRoot"></div>
+
+  <div class="rpt-watermark">Jute Sliver Analyzer — Mass Variation Report</div>
+</div>
+
+<script src="/shared.js?v=6"></script>
+<script>
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(v, dec=2) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return parseFloat(v.toFixed(dec)).toString();
+}
+
+// Always show exactly 2 decimal places — used for the ±1σ/±2σ/±3σ distribution
+// percentages, where fmt()'s toString() can collapse a value like 99.83 into "100"
+// once it rounds, hiding how close (or not) it really is to the limit.
+function fmtPct(v, dec=2) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return v.toFixed(dec);
+}
+
+// Fixed theoretical normal-distribution coverage percentages (textbook values
+// for a perfect Gaussian), shown in the ±1σ/±2σ/±3σ legend instead of the
+// empirical per-sample percentages. The bar segment widths still use the real
+// empirical pct1/pct2/pct3 so the visual shape reflects actual data.
+const SIGMA_PCT = { s1: 68.27, s2: 95.45, s3: 99.73 };
+
+function qBadge(q) {
+  const map = { Good:'qb-good', Moderate:'qb-moderate', Poor:'qb-poor' };
+  return `<span class="quality-badge ${map[q]||'qb-moderate'}">${q} quality</span>`;
+}
+
+function statCard(val, lbl, desc, cls='') {
+  return `<div class="stat-card ${cls}">
+    <div class="stat-val">${val}</div>
+    <div class="stat-lbl">${lbl}</div>
+    ${desc ? `<div class="stat-desc">${desc}</div>` : ''}
+  </div>`;
+}
+
+// ─── Canvas: Control Chart ────────────────────────────────────────────────────
+function drawControlChart(canvas, st, mode) {
+  const W = canvas.offsetWidth || 540;
+  const H = 220;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const unit = mode === 'weight' ? 'g' : 'mm';
+
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  const padL=60, padR=18, padT=20, padB=34;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+  const vals = st.values;
+  const allV = [st.ucl, Math.max(0,st.lcl), ...vals];
+  const minV = Math.min(...allV)*0.97, maxV = Math.max(...allV)*1.03;
+  const span = maxV-minV || 1;
+
+  const px = i => padL + (i/(vals.length-1||1))*plotW;
+  const py = v => padT + plotH - ((v-minV)/span)*plotH;
+
+  // Grid
+  ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=0.5;
+  for (let i=0;i<=5;i++) {
+    const y=padT+(i/5)*plotH;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+    const v=maxV-(i/5)*span;
+    ctx.fillStyle='#777'; ctx.font='9px Arial'; ctx.textAlign='right';
+    ctx.fillText(fmt(v,2)+' '+unit, padL-4, y+3);
+  }
+
+  // Control lines
+  const hline = (v, color, dash) => {
+    if (v < minV || v > maxV) return;
+    ctx.strokeStyle=color; ctx.lineWidth=1.2; ctx.setLineDash(dash||[]);
+    ctx.beginPath(); ctx.moveTo(padL,py(v)); ctx.lineTo(W-padR,py(v)); ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  hline(st.ucl, '#E24B4A', [5,3]);
+  hline(Math.max(0,st.lcl), '#E24B4A', [5,3]);
+  hline(st.mean, '#5DCAA5');
+
+  // Labels on left
+  ctx.fillStyle='#999'; ctx.font='9px Arial'; ctx.textAlign='right';
+  ctx.fillText('UCL', padL-4, py(st.ucl)-5);
+  ctx.fillText('X̄',  padL-4, py(st.mean)-5);
+  if (st.lcl > 0) ctx.fillText('LCL', padL-4, py(st.lcl)-5);
+
+  // Data line
+  ctx.strokeStyle='#5DCAA5'; ctx.lineWidth=1.8;
+  ctx.beginPath();
+  vals.forEach((v,i)=> i===0 ? ctx.moveTo(px(i),py(v)) : ctx.lineTo(px(i),py(v)));
+  ctx.stroke();
+
+  // Dots
+  vals.forEach((v,i)=> {
+    const out = st.outliers.includes(i);
+    ctx.beginPath(); ctx.arc(px(i),py(v), out?5.5:3.5, 0, 2*Math.PI);
+    ctx.fillStyle = out ? '#E24B4A' : '#5DCAA5'; ctx.fill();
+    if (out) {
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(px(i),py(v),5.5,0,2*Math.PI); ctx.stroke();
+    }
+  });
+
+  // X axis labels
+  ctx.fillStyle='#666'; ctx.font='9px Arial';
+  const step = Math.max(1, Math.ceil(vals.length/12));
+  vals.forEach((_,i)=> {
+    if (i%step===0 || i===vals.length-1) {
+      ctx.textAlign = i===0?'left': i===vals.length-1?'right':'center';
+      ctx.fillText(i+1, px(i), H-10);
+    }
+  });
+  ctx.fillStyle='#555'; ctx.font='9px Arial'; ctx.textAlign='center';
+  ctx.fillText('Measurement #', padL+plotW/2, H-1);
+}
+
+// ─── Canvas: Histogram ────────────────────────────────────────────────────────
+function drawHistogram(canvas, st, mode) {
+  const W = canvas.offsetWidth || 540;
+  const H = 190;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const unit = mode === 'weight' ? 'g' : 'mm';
+
+  ctx.fillStyle = '#faf9f6';
+  ctx.fillRect(0,0,W,H);
+
+  const n = st.values.length;
+  const bins = Math.min(30, Math.max(7, Math.round(1 + 3.322*Math.log10(n))));
+  const sorted = [...st.values].sort((a,b)=>a-b);
+  const vmin=sorted[0], vmax=sorted[n-1];
+  const binW=(vmax-vmin)/bins||1;
+  const counts=new Array(bins).fill(0);
+  st.values.forEach(v=>{ let b=Math.floor((v-vmin)/binW); if(b>=bins)b=bins-1; counts[b]++; });
+  const maxC=Math.max(...counts,1);
+
+  const padL=44, padR=14, padT=18, padB=32;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const bw=plotW/bins;
+
+  // Y grid + labels
+  ctx.strokeStyle='#e8e5de'; ctx.lineWidth=0.5;
+  for (let i=0;i<=4;i++) {
+    const y=padT+i/4*plotH;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+plotW,y); ctx.stroke();
+    ctx.fillStyle='#9a9890'; ctx.font='9px Arial'; ctx.textAlign='right';
+    ctx.fillText(Math.round((1-i/4)*maxC), padL-3, y+3);
+  }
+
+  // Bars
+  counts.forEach((c,i)=>{
+    const barH=(c/maxC)*plotH;
+    const x=padL+i*bw;
+    const center=vmin+(i+0.5)*binW;
+    const dist=Math.abs(center-st.mean)/(st.sdS||1);
+    ctx.fillStyle = dist<=1?'#1D9E75': dist<=2?'#BA7517':'#E24B4A';
+    ctx.fillRect(x+1, padT+plotH-barH, bw-2, barH);
+    if (c>0 && barH>14) {
+      ctx.fillStyle='#fff'; ctx.font='9px Arial'; ctx.textAlign='center';
+      ctx.fillText(c, x+bw/2, padT+plotH-barH+11);
+    }
+  });
+
+  // Mean line
+  const meanX=padL+((st.mean-vmin)/(vmax-vmin||1))*plotW;
+  ctx.strokeStyle='#185fa5'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(meanX,padT); ctx.lineTo(meanX,padT+plotH); ctx.stroke();
+  ctx.fillStyle='#185fa5'; ctx.font='bold 9px Arial'; ctx.textAlign='center';
+  ctx.fillText('X̄', meanX, padT-4);
+
+  // ±1σ, ±2σ shading
+  [2,1].forEach(sigma=>{
+    const lo=padL+((st.mean-sigma*st.sdS-vmin)/(vmax-vmin||1))*plotW;
+    const hi=padL+((st.mean+sigma*st.sdS-vmin)/(vmax-vmin||1))*plotW;
+    ctx.fillStyle=sigma===1?'rgba(29,158,117,0.07)':'rgba(186,117,23,0.05)';
+    ctx.fillRect(Math.max(padL,lo), padT, Math.min(padL+plotW,hi)-Math.max(padL,lo), plotH);
+  });
+
+  // X axis — one tick at every bin boundary, so each label marks where a bar
+  // starts/ends rather than landing at an arbitrary spot unrelated to the bars.
+  ctx.strokeStyle='#dbd8d0'; ctx.lineWidth=0.5;
+  ctx.beginPath(); ctx.moveTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+
+  // Skip every Nth boundary if there isn't enough room to print every label
+  // without overlap (roughly one label per 38px of plot width).
+  const maxLabels = Math.max(2, Math.floor(plotW/38));
+  const step = Math.max(1, Math.ceil(bins/maxLabels));
+
+  ctx.fillStyle='#9a9890'; ctx.font='9px Arial';
+  ctx.strokeStyle='#c8c4ba'; ctx.lineWidth=0.5;
+  for (let i=0; i<=bins; i+=step) {
+    const v = vmin + i*binW;
+    const x = padL + i*bw;
+    // small tick mark down from the axis line, so the label visibly lines up
+    // with the boundary between two bars rather than floating under them
+    ctx.beginPath(); ctx.moveTo(x, padT+plotH); ctx.lineTo(x, padT+plotH+4); ctx.stroke();
+    ctx.textAlign = i===0 ? 'left' : i===bins ? 'right' : 'center';
+    ctx.fillText(fmt(v)+' '+unit, x, H-10);
+  }
+}
+
+// ─── Build one sample section (HTML string) ───────────────────────────────────
+function buildSampleSection(s, unit, label, idx) {
+  const st = s.stats;
+  const cvClass = st.cvPct<5?'': st.cvPct<12?'warn':'danger';
+  const uClass  = st.uPct<4 ?'': st.uPct<10 ?'warn':'danger';
+  const colorBand = st.quality==='Good'?'#1D9E75': st.quality==='Moderate'?'#BA7517':'#E24B4A';
+
+  const cutTxt = s.cutLength ? ` · Cut: ${s.cutLength} cm` : '';
+  const p1 = st.pct1, p2 = st.pct2-st.pct1, p3 = st.pct3-st.pct2, p4 = 100-st.pct3;
+
+  return `
+  <div class="card" style="margin-bottom:1.25rem;border-left:4px solid ${colorBand};">
+    <div class="sample-header">
+      <span class="sample-name">${escapeHtml(s.name)}</span>
+      ${s.machine ? `<span class="machine-tag">${escapeHtml(s.machine)}</span>` : ''}
+      ${qBadge(st.quality)}
+      <span class="cut-tag">${label} (${unit})${cutTxt}</span>
+    </div>
+
+    <div class="section-label">Statistics</div>
+    <div class="stat-grid">
+      ${statCard(st.n, 'Measurements', '')}
+      ${statCard(fmt(st.mean)+' '+unit, `Mean ${label}`, 'Average')}
+      ${statCard(fmt(st.range)+' '+unit, 'Range', 'Max − Min')}
+      ${statCard(fmt(st.sdS)+' '+unit, 'SD (sample)', '±1σ spread')}
+      ${statCard(fmt(st.sdP)+' '+unit, 'SD (pop.)', 'Population σ')}
+      ${statCard(fmt(st.ucl)+' '+unit, 'UCL', 'Mean + 3σ')}
+      ${statCard(fmt(Math.max(0,st.lcl))+' '+unit, 'LCL', 'Mean − 3σ')}
+      ${statCard(fmt(st.cvPct)+'%', 'CV%', 'Coeff. of variation', cvClass)}
+      ${statCard(fmt(st.uPct)+'%', 'U%', 'Linear irregularity index', uClass)}
+      ${statCard(fmt(st.miu)+'%', 'MIU%', 'Range / Mean × 100')}
+      ${statCard(fmt(st.q1)+' '+unit, 'Q1', '25th percentile')}
+      ${statCard(fmt(st.q3)+' '+unit, 'Q3', '75th percentile')}
+      ${statCard(fmt(st.iqr)+' '+unit, 'IQR', 'Q3 − Q1')}
+      ${statCard(fmt(st.skew), 'Skewness', '0 = symmetric')}
+      ${statCard(st.outliers, 'Outliers', 'Beyond ±3σ', st.outliers>0?'warn':'')}
+    </div>
+
+    <div class="section-label">Normal distribution coverage</div>
+    <div class="dist-bar-bg">
+      <div class="dist-seg" style="background:#1D9E75;width:${p1}%;"></div>
+      <div class="dist-seg" style="background:#BA7517;width:${p2}%;"></div>
+      <div class="dist-seg" style="background:#E24B4A;width:${p3}%;"></div>
+      <div class="dist-seg" style="background:#f0ede6;width:${p4}%;"></div>
+    </div>
+    <div class="dist-legend">
+      <span><span class="dist-dot" style="background:#1D9E75;"></span>±1σ: ${fmtPct(SIGMA_PCT.s1)}%</span>
+      <span><span class="dist-dot" style="background:#BA7517;"></span>±2σ: ${fmtPct(SIGMA_PCT.s2)}%</span>
+      <span><span class="dist-dot" style="background:#E24B4A;"></span>±3σ: ${fmtPct(SIGMA_PCT.s3)}%</span>
+    </div>
+
+    <div class="section-label">Charts</div>
+    <div class="charts-row">
+      <div class="chart-col">
+        <div class="chart-title">Control Chart (±3σ limits)</div>
+        <canvas id="cc_${idx}" height="220"></canvas>
+        <div class="chart-note">
+          <span style="color:#5DCAA5;">●</span> In-control &nbsp;
+          <span style="color:#E24B4A;">●</span> Outlier &nbsp;
+          <span style="color:#E24B4A;">- -</span> UCL / LCL
+        </div>
+      </div>
+      <div class="chart-col">
+        <div class="chart-title">Distribution Histogram</div>
+        <canvas id="hist_${idx}" height="190"></canvas>
+        <div class="chart-note">
+          <span style="color:#1D9E75;">■</span> ±1σ &nbsp;
+          <span style="color:#BA7517;">■</span> ±2σ &nbsp;
+          <span style="color:#E24B4A;">■</span> &gt;2σ &nbsp;|&nbsp;
+          Blue line = mean X̄
+        </div>
+      </div>
+    </div>
+
+    ${s.notes ? `<div class="notes-box">📝 Notes: ${escapeHtml(s.notes)}</div>` : ''}
+  </div>`;
+}
+
+// ─── Build comparison table ───────────────────────────────────────────────────
+function buildCompareSection(samples, unit, label, competing) {
+  if (samples.length < 2) return '';
+  const [a, b] = samples;
+  const sa = a.stats, sb = b.stats;
+
+  const rows = [
+    ['Measurements (n)', sa.n, sb.n, 'higher'],
+    [`Mean ${label} (${unit})`, fmt(sa.mean), fmt(sb.mean), null],
+    [`Range (${unit})`, fmt(sa.range), fmt(sb.range), 'lower'],
+    [`SD sample (${unit})`, fmt(sa.sdS), fmt(sb.sdS), 'lower'],
+    ['CV%', fmt(sa.cvPct)+'%', fmt(sb.cvPct)+'%', 'lower'],
+    ['U%', fmt(sa.uPct)+'%', fmt(sb.uPct)+'%', 'lower'],
+    ['MIU%', fmt(sa.miu)+'%', fmt(sb.miu)+'%', 'lower'],
+    [`UCL (${unit})`, fmt(sa.ucl), fmt(sb.ucl), null],
+    [`LCL (${unit})`, fmt(Math.max(0,sa.lcl)), fmt(Math.max(0,sb.lcl)), null],
+    [`IQR (${unit})`, fmt(sa.iqr), fmt(sb.iqr), 'lower'],
+    ['Skewness', fmt(sa.skew), fmt(sb.skew), null],
+    ['Outliers', sa.outliers, sb.outliers, 'lower'],
+    ['Quality', sa.quality, sb.quality, null],
+  ];
+
+  const trows = rows.map(([lbl,va,vb,prefer])=>{
+    let better = '—';
+    if (competing && prefer) {
+      const na=parseFloat(va), nb=parseFloat(vb);
+      if (!isNaN(na)&&!isNaN(nb)&&na!==nb) {
+        if (prefer==='lower') better = na<nb ? '<span style="color:#1D9E75;font-weight:700;">A ✓</span>' : '<span style="color:#8a4fa0;font-weight:700;">B ✓</span>';
+        else better = na>nb ? '<span style="color:#1D9E75;font-weight:700;">A ✓</span>' : '<span style="color:#8a4fa0;font-weight:700;">B ✓</span>';
+      }
+    }
+    return `<tr>
+      <td>${lbl}</td>
+      <td style="color:#185fa5;font-weight:600;">${va}</td>
+      <td style="color:#8a4fa0;font-weight:600;">${vb}</td>
+      ${competing ? `<td>${better}</td>` : ''}
+    </tr>`;
+  }).join('');
+
+  return `<div class="card">
+    <h2 style="font-size:15px;font-weight:700;margin-bottom:0.75rem;">${escapeHtml(a.name)} ${competing ? 'vs' : '&'} ${escapeHtml(b.name)} — ${competing ? 'Comparison' : 'Side-by-side'}</h2>
+    ${competing ? '' : `<p style="font-size:12px;color:#6b6a64;margin:-0.5rem 0 0.75rem;">Shown side by side for reference only — no winner is implied between these two.</p>`}
+    <table class="compare-table">
+      <thead><tr>
+        <th>Metric</th>
+        <th style="color:#185fa5;">${escapeHtml(a.name)}</th>
+        <th style="color:#8a4fa0;">${escapeHtml(b.name)}</th>
+        ${competing ? '<th>Better</th>' : ''}
+      </tr></thead>
+      <tbody>${trows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ─── Main render ─────────────────────────────────────────────────────────────
+async function renderPage() {
+  await initTopbar('');
+
+  const root = document.getElementById('reportRoot');
+
+  // Load data from sessionStorage
+  let data;
+  try {
+    const raw = sessionStorage.getItem('mva_report_data');
+    data = raw ? JSON.parse(raw) : null;
+  } catch(e) { data = null; }
+
+  if (!data || !data.samples || !data.samples.length) {
+    root.innerHTML = `<div class="empty-state">
+      <p>No report data found.</p>
+      <p style="margin-top:0.5rem;font-size:13px;">Go back to Mass Variation → Analysis, enter measurements, click <strong>Analyse</strong>, then <strong>📄 Print Report</strong>.</p>
+      <p style="margin-top:1rem;"><a href="/mass-variation" style="color:#185fa5;">← Back to Mass Variation</a></p>
+    </div>`;
+    return;
+  }
+
+  const { samples, mode, generatedAt } = data;
+  const competing = data.competing !== false; // default true for older saved data
+  const isWeight = mode === 'weight';
+  const unit = isWeight ? 'g' : 'mm';
+  const label = isWeight ? 'Weight' : 'Width';
+  const modeTxt = isWeight ? 'Weight (g)' : 'Width (mm)';
+
+  // Page header
+  const title = samples.length === 1 ? samples[0].name
+    : competing ? samples.map(s=>s.name).join(' vs ')
+    : samples.map(s=>s.name).join(' & ');
+  root.innerHTML = `
+    <div class="rpt-header">
+      <div>
+        <div class="rpt-title">Mass Variation Report</div>
+        <div class="rpt-meta">${escapeHtml(title)} · ${modeTxt} · Generated ${escapeHtml(generatedAt)}</div>
+      </div>
+    </div>
+    ${samples.map((s,i) => buildSampleSection(s, unit, label, i)).join('')}
+    ${buildCompareSection(samples, unit, label, competing)}
+  `;
+
+  // Draw all canvases now that the DOM is in place
+  samples.forEach((s, i) => {
+    const st = s.stats;
+    // Rebuild full stats object with values array for charting
+    const full = { ...st, outliers: st.outlierIndices || [], values: st.values || [] };
+
+    const ccEl = document.getElementById('cc_'+i);
+    if (ccEl && full.values.length) {
+      drawControlChart(ccEl, full, mode);
+    } else if (ccEl) {
+      ccEl.style.display='none';
+      ccEl.insertAdjacentHTML('afterend','<div style="font-size:12px;color:#9a9890;padding:1rem;text-align:center;">Raw values not available for this chart.</div>');
+    }
+
+    const histEl = document.getElementById('hist_'+i);
+    if (histEl && full.values.length) {
+      drawHistogram(histEl, full, mode);
+    } else if (histEl) {
+      histEl.style.display='none';
+    }
+  });
+}
+
+renderPage();
+</script>
+</body>
+</html>
