@@ -1,0 +1,45 @@
+# Building JuteSliverAnalyzer.exe
+
+## Setup: nothing to install by hand
+
+There's no manual setup step anymore. You do NOT need to visit python.org or
+run any pip command yourself. `build.bat` handles everything on its own:
+
+- If Python is already on this machine, it uses that.
+- If not, it silently fetches a small portable copy of Python for itself
+  (no installer window, nothing to click through) and uses that instead.
+- Either way, it then installs Flask, Pillow, and PyInstaller automatically
+  if they aren't already present.
+
+The only requirement is an internet connection the first time you run it,
+since those pieces have to be downloaded from somewhere. Every run after the
+first reuses what's already there and skips straight to building.
+
+## Build the exe
+
+1. Make sure these are together in one folder:
+   - server.py
+   - JuteSliverAnalyzer.spec
+   - build.bat
+   - public\  (the whole folder)
+
+2. Double-click `build.bat`. That's the only step.
+
+3. Your exe will be at:
+```
+dist\JuteSliverAnalyzer.exe
+```
+
+## What to send friends
+
+Just send them `JuteSliverAnalyzer.exe` — that's it.
+- Double-click it
+- Browser opens automatically at http://localhost:3000
+- No installation needed on their end
+
+## Notes
+- First launch takes 3-5 seconds (unpacking)
+- Data (database + uploaded images) is saved next to the exe
+- If they get a Windows Defender warning, click "More info" → "Run anyway"
+  (this happens with all unsigned exes)
+- ANTHROPIC_API_KEY env var enables AI image validation (optional)
